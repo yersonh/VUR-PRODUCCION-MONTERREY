@@ -3,23 +3,48 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Dependencia;
+use App\Services\ClienteCore;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 
 class DependenciaAdminController extends Controller
 {
+    protected ClienteCore $core;
+
+    public function __construct(ClienteCore $core)
+    {
+        $this->core = $core;
+    }
+
     public function index(Request $request): JsonResponse
     {
-        $q = $request->string('q');
+        // GET /dependencias del Core no está paginado (array plano completo),
+        // así que la búsqueda y paginación se hacen aquí sobre el dataset
+        // entero, no solo sobre una página — esto sí es correcto (a diferencia
+        // de /admin/personal, que pagina desde el Core y solo puede filtrar
+        // la página ya traída).
+        $q = $request->string('q')->toString();
 
-        $data = Dependencia::when($q->isNotEmpty(), fn ($query) =>
-                $query->where('descripcion', 'ilike', "%{$q}%")
-            )
-            ->orderByDesc('id')
-            ->paginate($request->integer('per_page', 20));
+        $todas = collect($this->core->dependencias())
+            ->when($q !== '', fn (Collection $c) => $c->filter(
+                fn (array $d) => str_contains(mb_strtolower($d['nombre']), mb_strtolower($q))
+            ))
+            ->sortByDesc('id')
+            ->values();
 
-        return response()->json($data);
+        $perPage = $request->integer('per_page', 20);
+        $page    = $request->integer('page', 1);
+
+        $pagina = $todas->slice(($page - 1) * $perPage, $perPage)->values();
+
+        return response()->json([
+            'data'         => $pagina->map(fn (array $d) => $this->aFila($d)),
+            'current_page' => $page,
+            'last_page'    => (int) max(1, ceil($todas->count() / $perPage)),
+            'total'        => $todas->count(),
+            'per_page'     => $perPage,
+        ]);
     }
 
     public function store(Request $request): JsonResponse
@@ -29,24 +54,38 @@ class DependenciaAdminController extends Controller
             'activo'      => ['boolean'],
         ]);
 
-        $dep = Dependencia::create($data);
-        return response()->json($dep, 201);
-    }
-
-    public function update(Request $request, Dependencia $dependencia): JsonResponse
-    {
-        $data = $request->validate([
-            'descripcion' => ['required', 'string', 'max:120'],
-            'activo'      => ['boolean'],
+        // NOTA: el Core no acepta 'activo' al crear una dependencia (no está
+        // documentado en el body de POST /dependencias), así que no se envía.
+        $dependencia = $this->core->crearDependencia([
+            'nombre' => $data['descripcion'],
         ]);
 
-        $dependencia->update($data);
-        return response()->json($dependencia);
+        return response()->json($this->aFila($dependencia), 201);
     }
 
-    public function toggleActivo(Dependencia $dependencia): JsonResponse
+    public function update(Request $request, int $dependencia): JsonResponse
     {
-        $dependencia->update(['activo' => ! $dependencia->activo]);
-        return response()->json($dependencia);
+        // El Core documenta explícitamente que /dependencias "No tiene update".
+        // No se inventa ese endpoint.
+        return response()->json([
+            'message' => 'Editar dependencias no está soportado: el Core no expone un endpoint de actualización.',
+        ], 501);
+    }
+
+    public function toggleActivo(int $dependencia): JsonResponse
+    {
+        // Tampoco hay endpoint documentado para activar/desactivar dependencias.
+        return response()->json([
+            'message' => 'Activar/desactivar dependencias no está soportado: el Core no expone un endpoint para esto.',
+        ], 501);
+    }
+
+    private function aFila(array $dependencia): array
+    {
+        return [
+            'id'          => $dependencia['id'],
+            'descripcion' => $dependencia['nombre'],
+            'activo'      => $dependencia['activo'] ?? true,
+        ];
     }
 }

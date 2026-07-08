@@ -19,9 +19,6 @@ return Application::configure(basePath: dirname(__DIR__))
             \Illuminate\Http\Middleware\HandleCors::class,
         ]);
 
-        // Sanctum stateful para SPA (cookies en mismo dominio)
-        $middleware->statefulApi();
-
         // Alias de middlewares personalizados
         $middleware->alias([
             'admin' => \App\Http\Middleware\EnsureAdmin::class,

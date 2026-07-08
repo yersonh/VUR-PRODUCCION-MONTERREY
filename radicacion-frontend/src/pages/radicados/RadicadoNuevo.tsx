@@ -156,6 +156,8 @@ export default function RadicadoNuevo() {
   const [iaRevisado, setIaRevisado] = useState(false)
   const [confirmIARevision, setConfirmIARevision] = useState(false)
   const pendingValuesRef = useRef<import('@/hooks/useRadicadoForm').RadicadoFormValues | null>(null)
+  const enviandoRef = useRef(false)
+  const [enviandoRadicado, setEnviandoRadicado] = useState(false)
 
   // ── Lista dinámica de anexos ──────────────────────────────────────
   const [anexosItems, setAnexosItems] = useState<{ descripcion: string; tipo_id: number | null }[]>([])
@@ -705,6 +707,12 @@ export default function RadicadoNuevo() {
 
   // ── Submit ─────────────────────────────────────────────────────────
   const enviarRadicado = async (values: import('@/hooks/useRadicadoForm').RadicadoFormValues) => {
+    // Evita duplicados: el botón "Confirmar y Radicar" del modal de revisión
+    // IA no pasa por handleSubmit() de react-hook-form, así que no queda
+    // protegido por isSubmitting — un doble clic ahí disparaba dos POST.
+    if (enviandoRef.current) return
+    enviandoRef.current = true
+    setEnviandoRadicado(true)
     try {
       const formData = new FormData()
       Object.entries(values).forEach(([k, v]) => {
@@ -740,6 +748,9 @@ export default function RadicadoNuevo() {
       navigate('/radicados')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error al guardar el radicado')
+    } finally {
+      enviandoRef.current = false
+      setEnviandoRadicado(false)
     }
   }
 
@@ -1878,6 +1889,7 @@ export default function RadicadoNuevo() {
         labelNo="Volver a revisar"
         onSi={handleConfirmarIAYEnviar}
         onNo={() => { setConfirmIARevision(false); pendingValuesRef.current = null }}
+        loadingSi={enviandoRadicado}
       />
     </AppLayout>
   )

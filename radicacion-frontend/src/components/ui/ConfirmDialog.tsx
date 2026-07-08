@@ -9,6 +9,7 @@ interface ConfirmDialogProps {
   labelNo?: string
   onSi: () => void
   onNo: () => void
+  loadingSi?: boolean
 }
 
 const backdrop = { hidden: { opacity: 0 }, visible: { opacity: 1 } }
@@ -19,7 +20,7 @@ const panel = {
 }
 
 export function ConfirmDialog({
-  open, title = '¡Atención!', message, labelSi = 'SÍ', labelNo = 'NO', onSi, onNo,
+  open, title = '¡Atención!', message, labelSi = 'SÍ', labelNo = 'NO', onSi, onNo, loadingSi = false,
 }: ConfirmDialogProps) {
   return (
     <AnimatePresence>
@@ -63,9 +64,10 @@ export function ConfirmDialog({
                 <button
                   type="button"
                   onClick={onSi}
-                  className="flex-1 py-2.5 px-4 rounded-xl bg-green-600 text-white font-semibold text-sm hover:bg-green-700 transition-colors"
+                  disabled={loadingSi}
+                  className="flex-1 py-2.5 px-4 rounded-xl bg-green-600 text-white font-semibold text-sm hover:bg-green-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  {labelSi} ✓
+                  {loadingSi ? 'Guardando...' : `${labelSi} ✓`}
                 </button>
               </div>
             </div>

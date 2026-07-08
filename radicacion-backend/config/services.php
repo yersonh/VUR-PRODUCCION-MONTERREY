@@ -22,6 +22,11 @@ return [
         'model'   => env('GEMINI_MODEL', 'gemini-2.5-flash'),
     ],
 
+    // ── Core Institucional (datos maestros: personas, dependencias, funcionarios) ──
+    'core' => [
+        'url'   => env('CORE_API_URL'),
+        'token' => env('CORE_API_TOKEN'),
+    ],
     // ── Brevo (correos transaccionales vía API REST) ───────────────
     'brevo' => [
         'api_key'    => env('BREVO_API_KEY'),

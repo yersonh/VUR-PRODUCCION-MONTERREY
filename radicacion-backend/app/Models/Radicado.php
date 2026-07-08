@@ -38,13 +38,14 @@ class Radicado extends Model
     ];
 
     // ── Relaciones ──────────────────────────────────────────────────
+    // 'funcionario_id', 'personal_destino_id', 'dependencia_remitente_id' y
+    // 'dependencia_destino_id' ya NO son relaciones Eloquent: apuntan a
+    // recursos del Core (funcionarios/dependencias), sin FK local. Se
+    // resuelven vía ClienteCore desde RadicadoService (ver
+    // funcionarioInfo()/dependenciaInfo()), no como belongsTo aquí.
     public function tercero(): BelongsTo          { return $this->belongsTo(Tercero::class); }
-    public function funcionario(): BelongsTo      { return $this->belongsTo(Personal::class, 'funcionario_id'); }
-    public function dependenciaRemitente(): BelongsTo { return $this->belongsTo(Dependencia::class, 'dependencia_remitente_id'); }
     public function tipoCorrespondencia(): BelongsTo  { return $this->belongsTo(TipoCorrespondencia::class); }
     public function auxTip(): BelongsTo           { return $this->belongsTo(AuxTip::class); }
-    public function dependenciaDestino(): BelongsTo   { return $this->belongsTo(Dependencia::class, 'dependencia_destino_id'); }
-    public function personalDestino(): BelongsTo  { return $this->belongsTo(Personal::class, 'personal_destino_id'); }
     public function terceroDestino(): BelongsTo   { return $this->belongsTo(Tercero::class, 'tercero_destino_id'); }
     public function tipoAnexo(): BelongsTo        { return $this->belongsTo(TipoAnexo::class); }
     public function medioIngreso(): BelongsTo     { return $this->belongsTo(MedioIngreso::class); }
@@ -57,15 +58,5 @@ class Radicado extends Model
     public function getNumeroRadicadoAttribute(): string
     {
         return sprintf('%d-%06d', $this->año_radicado, $this->nro_radicado);
-    }
-
-    // ── Nombre remitente calculado ──────────────────────────────────
-    public function getRemitenteDisplayAttribute(): string
-    {
-        return match ($this->tipo_remitente) {
-            'TERCERO_NIT'  => $this->tercero?->nombre_completo ?? $this->nombre_persona_empresa ?? '—',
-            'FUNCIONARIO'  => $this->funcionario?->nombre_completo ?? '—',
-            default        => $this->nombre_persona_empresa ?? '—',
-        };
     }
 }

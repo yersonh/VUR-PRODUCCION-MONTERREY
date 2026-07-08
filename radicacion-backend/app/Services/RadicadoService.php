@@ -6,10 +6,12 @@ use App\Models\EstadoCorrespondencia;
 use App\Models\Radicado;
 use App\Models\RadicadoActuacion;
 use App\Models\RadicadoDocumento;
+use App\Models\Tercero;
 use App\Models\TipoCorrespondencia;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class RadicadoService
 {
@@ -18,6 +20,7 @@ class RadicadoService
         private GeminiService        $gemini,
         private BrevoMailService     $brevo,
         private NotificacionService  $notificacion,
+        private ClienteCore          $core,
     ) {}
 
     /**
@@ -98,8 +101,8 @@ class RadicadoService
             $this->notificacion->notificarNuevoRadicado($radicado, $operadorId);
 
             // Correo de confirmación al remitente si tiene email
-            $emailRemitente = $radicado->tercero?->email ?? null;
-            $nombreRemitente = $radicado->remitenteDisplay;
+            $emailRemitente  = $this->emailRemitente($radicado);
+            $nombreRemitente = $this->nombreRemitente($radicado);
 
             if ($emailRemitente) {
                 $this->brevo->enviarConfirmacionRadicado(
@@ -108,7 +111,7 @@ class RadicadoService
                     numeroRadicado:         $radicado->numeroRadicado,
                     fechaRadicacion:        $radicado->fecha_radicacion,
                     tipoCorrespondencia:    $radicado->tipoCorrespondencia?->descripcion ?? '',
-                    dependenciaDestino:     $radicado->dependenciaDestino?->descripcion ?? '',
+                    dependenciaDestino:     $this->dependenciaInfo($radicado->dependencia_destino_id)['descripcion'] ?? '',
                     fechaLimite:            $radicado->fecha_limite,
                 );
             }
@@ -197,14 +200,10 @@ class RadicadoService
     public function relaciones(): array
     {
         return [
-            'tercero.tipoIdentificacion',
-            'funcionario.dependencia',
-            'dependenciaRemitente',
+            'tercero',
+            'terceroDestino',
             'tipoCorrespondencia',
             'auxTip',
-            'dependenciaDestino',
-            'personalDestino',
-            'terceroDestino.tipoIdentificacion',
             'tipoAnexo',
             'medioIngreso',
             'estado',
@@ -214,5 +213,102 @@ class RadicadoService
             'actuaciones.estadoNuevo',
             'actuaciones.usuario',
         ];
+    }
+
+    // ── Enriquecimiento con datos del Core ────────────────────────────
+    // 'funcionario_id', 'personal_destino_id', 'dependencia_remitente_id' y
+    // 'dependencia_destino_id' son columnas planas (sin FK) que apuntan a
+    // recursos del Core. Estos helpers los resuelven vía ClienteCore.
+
+    public function dependenciaInfo(?int $id): ?array
+    {
+        if (!$id) {
+            return null;
+        }
+
+        $dependencia = collect($this->core->dependencias())->firstWhere('id', $id);
+        if (!$dependencia) {
+            return null;
+        }
+
+        return [
+            'id'          => $dependencia['id'],
+            'descripcion' => $dependencia['nombre'],
+            'activo'      => $dependencia['activo'] ?? true,
+        ];
+    }
+
+    public function funcionarioInfo(?int $id): ?array
+    {
+        if (!$id) {
+            return null;
+        }
+
+        try {
+            $funcionario = $this->core->funcionario($id);
+        } catch (\Throwable $e) {
+            Log::warning("No se pudo cargar funcionario {$id} del Core: {$e->getMessage()}");
+            return null;
+        }
+
+        $persona = $funcionario['persona'] ?? [];
+
+        return [
+            'id'              => $funcionario['id'],
+            'cedula'          => $persona['numero_identificacion'] ?? '',
+            'nombre_completo' => trim(($persona['nombres'] ?? '').' '.($persona['apellidos'] ?? '')),
+            'cargo'           => $funcionario['cargo'] ?? null,
+            'email'           => $persona['email'] ?? null,
+            'dependencia_id'  => $funcionario['dependencia_id'] ?? null,
+        ];
+    }
+
+    public function terceroInfo(?Tercero $tercero): ?array
+    {
+        if (!$tercero) {
+            return null;
+        }
+
+        try {
+            $entidad = $tercero->categoria === 'EMPRESA'
+                ? $this->core->empresa($tercero->core_id)
+                : $this->core->ciudadano($tercero->core_id);
+        } catch (\Throwable $e) {
+            Log::warning("No se pudo cargar {$tercero->categoria} {$tercero->core_id} del Core: {$e->getMessage()}");
+            return null;
+        }
+
+        $esEmpresa = $tercero->categoria === 'EMPRESA';
+
+        return [
+            'id'              => $tercero->id,
+            'codigo'          => $tercero->codigo,
+            'categoria'       => $tercero->categoria,
+            'nro_identificacion' => $esEmpresa ? ($entidad['nit'] ?? '') : ($entidad['numero_identificacion'] ?? ''),
+            'nombre_completo' => $esEmpresa
+                ? ($entidad['razon_social'] ?? '')
+                : trim(($entidad['nombres'] ?? '').' '.($entidad['apellidos'] ?? '')),
+            'email'    => $entidad['email'] ?? null,
+            'telefono' => $entidad['telefono'] ?? null,
+        ];
+    }
+
+    public function nombreRemitente(Radicado $radicado): string
+    {
+        return match ($radicado->tipo_remitente) {
+            'TERCERO_NIT', 'CIUDADANO' => $this->terceroInfo($radicado->tercero)['nombre_completo']
+                ?? $radicado->nombre_persona_empresa ?? '—',
+            'FUNCIONARIO' => $this->funcionarioInfo($radicado->funcionario_id)['nombre_completo'] ?? '—',
+            default       => $radicado->nombre_persona_empresa ?? '—',
+        };
+    }
+
+    public function emailRemitente(Radicado $radicado): ?string
+    {
+        return match ($radicado->tipo_remitente) {
+            'TERCERO_NIT', 'CIUDADANO' => $this->terceroInfo($radicado->tercero)['email'] ?? null,
+            'FUNCIONARIO'              => $this->funcionarioInfo($radicado->funcionario_id)['email'] ?? null,
+            default                    => null,
+        };
     }
 }

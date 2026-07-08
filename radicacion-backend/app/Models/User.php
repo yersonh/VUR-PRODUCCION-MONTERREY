@@ -33,10 +33,9 @@ class User extends Authenticatable
         return $this->belongsTo(Role::class);
     }
 
-    public function dependencia(): BelongsTo
-    {
-        return $this->belongsTo(Dependencia::class);
-    }
+    // 'dependencia_id' ya no es una relación Eloquent: apunta a una
+    // dependencia del Core (sin FK local). Se resuelve vía ClienteCore
+    // donde se necesite mostrarla (ver AuthController/UserAdminController).
 
     public function isAdmin(): bool
     {

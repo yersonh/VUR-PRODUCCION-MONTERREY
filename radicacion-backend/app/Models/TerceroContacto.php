@@ -3,21 +3,18 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+// Contacto/responsable de una empresa para efectos de correspondencia.
+// Es dato exclusivo de VUR: el Core no tiene este concepto. 'empresa_id'
+// referencia directamente el id de la empresa en el Core (sin FK local).
 class TerceroContacto extends Model
 {
     protected $fillable = [
-        'tercero_id', 'nombres', 'primer_apellido', 'segundo_apellido',
+        'empresa_id', 'nombres', 'primer_apellido', 'segundo_apellido',
         'cargo', 'email', 'telefono', 'activo',
     ];
 
     protected $casts = ['activo' => 'boolean'];
-
-    public function tercero(): BelongsTo
-    {
-        return $this->belongsTo(Tercero::class);
-    }
 
     public function getNombreCompletoAttribute(): string
     {

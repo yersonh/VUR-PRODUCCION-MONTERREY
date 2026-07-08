@@ -4,20 +4,35 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuxTip;
-use App\Models\Dependencia;
 use App\Models\EstadoCorrespondencia;
 use App\Models\MedioIngreso;
 use App\Models\TipoAnexo;
 use App\Models\TipoCorrespondencia;
-use App\Models\TipoIdentificacion;
+use App\Services\ClienteCore;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class CatalogoController extends Controller
 {
+    protected ClienteCore $core;
+
+    public function __construct(ClienteCore $core)
+    {
+        $this->core = $core;
+    }
+
     public function dependencias(): JsonResponse
     {
-        $data = Dependencia::activo()->orderBy('descripcion')->get();
+        $data = collect($this->core->dependencias())
+            ->where('activo', true)
+            ->sortBy('nombre')
+            ->values()
+            ->map(fn (array $d) => [
+                'id'          => $d['id'],
+                'descripcion' => $d['nombre'],
+                'activo'      => $d['activo'],
+            ]);
+
         return response()->json($data);
     }
 
@@ -48,7 +63,11 @@ class CatalogoController extends Controller
 
     public function tiposIdentificacion(): JsonResponse
     {
-        return response()->json(['data' => TipoIdentificacion::orderBy('descripcion')->get()]);
+        $data = collect($this->core->tiposIdentificacion())
+            ->sortBy('descripcion')
+            ->values();
+
+        return response()->json(['data' => $data]);
     }
 
     public function estados(): JsonResponse

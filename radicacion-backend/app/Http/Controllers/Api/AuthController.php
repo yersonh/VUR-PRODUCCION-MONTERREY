@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\ClienteCore;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -11,6 +12,8 @@ use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
+    public function __construct(private ClienteCore $core) {}
+
     public function login(Request $request): JsonResponse
     {
         $credentials = $request->validate([
@@ -47,7 +50,7 @@ class AuthController extends Controller
     public function me(Request $request): JsonResponse
     {
         /** @var User $user */
-        $user = $request->user()->load('role', 'dependencia');
+        $user = $request->user()->load('role');
 
         return response()->json(['user' => $this->formatUser($user)]);
     }
@@ -70,10 +73,24 @@ class AuthController extends Controller
                 'nombre'      => $user->role->nombre,
                 'descripcion' => $user->role->descripcion,
             ] : null,
-            'dependencia'     => $user->dependencia ? [
-                'id'          => $user->dependencia->id,
-                'descripcion' => $user->dependencia->descripcion,
-            ] : null,
+            'dependencia'     => $this->dependenciaInfo($user->dependencia_id),
+        ];
+    }
+
+    private function dependenciaInfo(?int $id): ?array
+    {
+        if (!$id) {
+            return null;
+        }
+
+        $dependencia = collect($this->core->dependencias())->firstWhere('id', $id);
+        if (!$dependencia) {
+            return null;
+        }
+
+        return [
+            'id'          => $dependencia['id'],
+            'descripcion' => $dependencia['nombre'],
         ];
     }
 }

@@ -5,16 +5,19 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Radicado;
 use App\Services\BrevoMailService;
+use App\Services\ClienteCore;
 use App\Services\RadicadoService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 
 class RadicadoController extends Controller
 {
     public function __construct(
         private RadicadoService  $service,
         private BrevoMailService $brevo,
+        private ClienteCore      $core,
     ) {}
 
     // ── GET /radicados/siguiente-numero ───────────────────────────
@@ -34,8 +37,7 @@ class RadicadoController extends Controller
         $perPage = min((int) $request->integer('per_page', 20), 100);
 
         $query = Radicado::with([
-            'tercero', 'funcionario',
-            'tipoCorrespondencia', 'dependenciaDestino',
+            'tercero', 'tipoCorrespondencia',
             'medioIngreso', 'estado', 'operador', 'documentos',
         ])
         ->when($request->filled('nro_radicado'), function ($q) use ($request) {
@@ -60,21 +62,14 @@ class RadicadoController extends Controller
         ->when($request->filled('fecha_hasta'), fn ($q) =>
             $q->where('fecha_radicacion', '<=', $request->string('fecha_hasta'))
         )
-        ->when($request->filled('remitente'), function ($q) use ($request) {
-            $r = $request->string('remitente');
-            $q->where(fn ($q2) =>
-                $q2->whereHas('tercero', fn ($q3) =>
-                    $q3->where('nombres', 'ilike', "%{$r}%")
-                       ->orWhere('primer_apellido', 'ilike', "%{$r}%")
-                       ->orWhere('nro_identificacion', 'ilike', "%{$r}%")
-                )
-                ->orWhereHas('funcionario', fn ($q3) =>
-                    $q3->where('nombres', 'ilike', "%{$r}%")
-                       ->orWhere('cedula', 'ilike', "%{$r}%")
-                )
-                ->orWhere('nombre_persona_empresa', 'ilike', "%{$r}%")
-            );
-        })
+        // NOTA: antes esto también buscaba por nombre/cédula del tercero y del
+        // funcionario remitente (whereHas sobre columnas que vivían en las
+        // tablas locales 'terceros'/'personal'). Esos datos ahora viven en el
+        // Core, que no expone búsqueda de texto, así que el filtro por
+        // 'remitente' se redujo a lo que sigue siendo una columna local real.
+        ->when($request->filled('remitente'), fn ($q) =>
+            $q->where('nombre_persona_empresa', 'ilike', '%'.$request->string('remitente').'%')
+        )
         ->when($request->filled('tipo_correspondencia_id'), fn ($q) =>
             $q->where('tipo_correspondencia_id', $request->integer('tipo_correspondencia_id'))
         )
@@ -93,9 +88,9 @@ class RadicadoController extends Controller
             'hora_radicacion'                 => $r->hora_radicacion,
             'manejo'                          => $r->manejo,
             'procedencia'                     => $r->procedencia,
-            'remitente_display'               => $r->remitente_display,
+            'remitente_display'               => $this->service->nombreRemitente($r),
             'tipo_correspondencia_descripcion'=> $r->tipoCorrespondencia?->descripcion,
-            'dependencia_destino_descripcion' => $r->dependenciaDestino?->descripcion,
+            'dependencia_destino_descripcion' => $this->service->dependenciaInfo($r->dependencia_destino_id)['descripcion'] ?? null,
             'aux_descripcion'                 => $r->aux_descripcion,
             'nombre_persona_empresa'          => $r->nombre_persona_empresa,
             'estado_codigo'                   => $r->estado?->codigo,
@@ -105,14 +100,17 @@ class RadicadoController extends Controller
             'tiene_pdf_salida'                => $r->documentos->where('tipo', 'SALIDA')->isNotEmpty(),
         ]);
 
+        // Forma plana (current_page/last_page/total/per_page al mismo nivel que
+        // 'data'), igual que el resto de endpoints paginados del sistema — el
+        // frontend usa el mismo parsePaginated() en todos. Antes iba anidado
+        // bajo 'meta', lo que dejaba esos campos en undefined en el cliente
+        // (de ahí el "NaN-NaN de 0" y el warning de key en la paginación).
         return response()->json([
-            'data' => $items,
-            'meta' => [
-                'current_page' => $paginated->currentPage(),
-                'last_page'    => $paginated->lastPage(),
-                'total'        => $paginated->total(),
-                'per_page'     => $paginated->perPage(),
-            ],
+            'data'         => $items,
+            'current_page' => $paginated->currentPage(),
+            'last_page'    => $paginated->lastPage(),
+            'total'        => $paginated->total(),
+            'per_page'     => $paginated->perPage(),
         ]);
     }
 
@@ -136,15 +134,15 @@ class RadicadoController extends Controller
         );
 
         // Notificar remitente si tiene email
-        $emailRemitente = $this->emailRemitente($radicado);
+        $emailRemitente = $this->service->emailRemitente($radicado);
         if ($emailRemitente) {
             $this->brevo->enviarConfirmacionRadicado(
                 destinatarioEmail:     $emailRemitente,
-                destinatarioNombre:    $radicado->remitente_display,
+                destinatarioNombre:    $this->service->nombreRemitente($radicado),
                 numeroRadicado:        $radicado->numero_radicado,
                 fechaRadicacion:       $radicado->fecha_radicacion->format('d/m/Y'),
                 tipoCorrespondencia:   $radicado->tipoCorrespondencia?->descripcion ?? '',
-                dependenciaDestino:    $radicado->dependenciaDestino?->descripcion ?? '',
+                dependenciaDestino:    $this->service->dependenciaInfo($radicado->dependencia_destino_id)['descripcion'] ?? '',
                 fechaLimite:           $radicado->fecha_limite?->format('d/m/Y'),
             );
         }
@@ -260,15 +258,19 @@ class RadicadoController extends Controller
             'procedencia'             => ['required', 'in:EXTERNO,INTERNO'],
             'tipo_remitente'          => ['required', 'in:FUNCIONARIO,TERCERO_NIT,CIUDADANO'],
             'tercero_id'              => ['nullable', 'integer', 'exists:terceros,id'],
-            'funcionario_id'          => ['nullable', 'integer', 'exists:personal,id'],
-            'dependencia_remitente_id'=> ['nullable', 'integer', 'exists:dependencias,id'],
+            // 'funcionario_id'/'personal_destino_id' referencian funcionarios del
+            // Core (sin FK local). Validar su existencia ahí en cada submit
+            // implicaría una llamada HTTP extra por campo; se deja solo el tipo
+            // y se degrada con gracia (null) al mostrarlo si el id no existe.
+            'funcionario_id'          => ['nullable', 'integer'],
+            'dependencia_remitente_id'=> ['nullable', 'integer', Rule::in($this->idsDependenciasCore())],
             'nombre_persona_empresa'  => ['nullable', 'string', 'max:100'],
             'tipo_correspondencia_id' => ['required', 'integer', 'exists:tipos_correspondencia,id'],
             'aux_tip_id'              => ['nullable', 'integer', 'exists:aux_tips,id'],
             'aux_descripcion'         => ['nullable', 'string', 'max:100'],
             'tipo_destino'            => ['required', 'in:INTERNO,TERCERO_NIT,CIUDADANO'],
-            'dependencia_destino_id'  => ['required_if:tipo_destino,INTERNO', 'nullable', 'integer', 'exists:dependencias,id'],
-            'personal_destino_id'     => ['nullable', 'integer', 'exists:personal,id'],
+            'dependencia_destino_id'  => ['required_if:tipo_destino,INTERNO', 'nullable', 'integer', Rule::in($this->idsDependenciasCore())],
+            'personal_destino_id'     => ['nullable', 'integer'],
             'tercero_destino_id'      => ['required_if:tipo_destino,TERCERO_NIT,CIUDADANO', 'nullable', 'integer', 'exists:terceros,id'],
             'nombre_persona_destino'  => ['nullable', 'string', 'max:100'],
             'folios'                  => ['nullable', 'integer', 'min:1'],
@@ -291,13 +293,9 @@ class RadicadoController extends Controller
         ];
     }
 
-    private function emailRemitente(Radicado $radicado): ?string
+    private function idsDependenciasCore(): array
     {
-        return match ($radicado->tipo_remitente) {
-            'TERCERO_NIT', 'CIUDADANO' => $radicado->tercero?->email,
-            'FUNCIONARIO'              => $radicado->funcionario?->email,
-            default                    => null,
-        };
+        return collect($this->core->dependencias())->pluck('id')->all();
     }
 
     private function formatDetalle(Radicado $r): array
@@ -312,18 +310,18 @@ class RadicadoController extends Controller
             'fecha_radicacion'     => $r->fecha_radicacion?->toDateString(),
             'hora_radicacion'      => $r->hora_radicacion,
             'tipo_remitente'       => $r->tipo_remitente,
-            'tercero'              => $r->tercero,
-            'funcionario'          => $r->funcionario,
-            'dependencia_remitente'=> $r->dependenciaRemitente,
+            'tercero'              => $this->service->terceroInfo($r->tercero),
+            'funcionario'          => $this->service->funcionarioInfo($r->funcionario_id),
+            'dependencia_remitente'=> $this->service->dependenciaInfo($r->dependencia_remitente_id),
             'nombre_persona_empresa'=> $r->nombre_persona_empresa,
             'tipo_correspondencia' => $r->tipoCorrespondencia,
             'aux_tip'              => $r->auxTip,
             'aux_descripcion'      => $r->aux_descripcion,
             'fecha_limite'         => $r->fecha_limite?->toDateString(),
             'tipo_destino'         => $r->tipo_destino,
-            'dependencia_destino'  => $r->dependenciaDestino,
-            'personal_destino'     => $r->personalDestino,
-            'tercero_destino'      => $r->terceroDestino,
+            'dependencia_destino'  => $this->service->dependenciaInfo($r->dependencia_destino_id),
+            'personal_destino'     => $this->service->funcionarioInfo($r->personal_destino_id),
+            'tercero_destino'      => $this->service->terceroInfo($r->terceroDestino),
             'nombre_persona_destino' => $r->nombre_persona_destino,
             'folios'               => $r->folios,
             'folios_de'            => $r->folios_de,
