@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create('pacientes', function (Blueprint $table) {
             $table->id();
             $table->string('codigo_historia', 30)->unique();
-            $table->foreignId('tipo_identificacion_id')->constrained('tipos_identificacion');
+            $table->unsignedBigInteger('tipo_identificacion_id'); // Referencia a Core, sin FK local (tabla pacientes será eliminada en migración posterior)
             $table->string('nro_identificacion', 20)->unique();
             $table->string('nombres', 80);
             $table->string('primer_apellido', 60);

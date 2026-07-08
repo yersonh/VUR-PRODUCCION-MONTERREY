@@ -8,10 +8,8 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('dependencias', function (Blueprint $table) {
-            $table->dropUnique('dependencias_codigo_unique');
-            $table->dropColumn('codigo');
-        });
+        // Bloque de 'dependencias' eliminado: esa tabla ya no existe localmente
+        // (los datos de dependencias ahora viven en el Core y se consumen vía API).
 
         Schema::table('tipos_correspondencia', function (Blueprint $table) {
             $table->dropUnique('tipos_correspondencia_codigo_unique');
@@ -41,9 +39,7 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::table('dependencias', function (Blueprint $table) {
-            $table->string('codigo', 10)->nullable()->after('id');
-        });
+        // Bloque de 'dependencias' eliminado: esa tabla ya no existe localmente.
 
         Schema::table('tipos_correspondencia', function (Blueprint $table) {
             $table->string('codigo', 20)->nullable()->after('id');

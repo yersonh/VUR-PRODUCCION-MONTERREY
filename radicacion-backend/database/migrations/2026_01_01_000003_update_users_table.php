@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::table('users', function (Blueprint $table) {
             $table->string('codigo_usuario', 20)->unique()->nullable()->after('name');
             $table->foreignId('role_id')->constrained('roles')->after('email');
-            $table->foreignId('dependencia_id')->nullable()->constrained('dependencias')->after('role_id');
+            $table->unsignedBigInteger('dependencia_id')->nullable()->after('role_id'); // Referencia a Core (dependencia), sin FK local
             $table->boolean('activo')->default(true)->after('dependencia_id');
         });
     }
@@ -20,7 +20,6 @@ return new class extends Migration
     {
         Schema::table('users', function (Blueprint $table) {
             $table->dropForeign(['role_id']);
-            $table->dropForeign(['dependencia_id']);
             $table->dropColumn(['codigo_usuario', 'role_id', 'dependencia_id', 'activo']);
         });
     }

@@ -14,16 +14,11 @@ return new class extends Migration
             $table->string('nombre_contacto', 100)->nullable()->after('nombres'); // responsable en empresa
         });
 
-        // Backfill: derivar categoria de tipo_identificacion existente
-        DB::statement("
-            UPDATE terceros
-            SET categoria = CASE
-                WHEN tipo_identificacion_id IN (
-                    SELECT id FROM tipos_identificacion WHERE upper(codigo) = 'NIT'
-                ) THEN 'EMPRESA'
-                ELSE 'CIUDADANO'
-            END
-        ");
+        // NOTA: El backfill original derivaba 'categoria' consultando la tabla local
+        // tipos_identificacion, que ya no existe (ahora vive en el Core, vía API).
+        // Se deja 'categoria' en NULL por defecto; debe asignarse desde la aplicación
+        // (por ejemplo, al crear o sincronizar un tercero, consultando el Core API
+        // para saber si el tipo de identificación corresponde a NIT o no).
     }
 
     public function down(): void
