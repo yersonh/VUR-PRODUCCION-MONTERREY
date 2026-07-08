@@ -3,7 +3,6 @@
 namespace Database\Seeders;
 
 use App\Models\AuxTip;
-use App\Models\Dependencia;
 use App\Models\Role;
 use App\Models\TipoCorrespondencia;
 use App\Models\User;
@@ -14,29 +13,6 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        // Dependencias
-        $dependencias = [
-            'ADMIN',
-            'Despacho del alcalde',
-            'Oficina de Control Interno',
-            'Oficina Asesora de Planeación',
-            'Oficina Asesora de jurídica',
-            'Secretaria General',
-            'Secretaria de Infraestructura',
-            'Secretaría de Desarrollo Social',
-            'Secretaría de Hacienda',
-            'Secretaría de Desarrollo Económico y Medio ambiente',
-            'Secretaria De Gobierno Seguridad Y Convivencia',
-            'Secretaría de Educación, Cultura y Turismo',
-        ];
-
-        foreach ($dependencias as $descripcion) {
-            Dependencia::firstOrCreate(
-                ['descripcion' => $descripcion],
-                ['activo' => true]
-            );
-        }
-
         // Aux Tips
         $auxTips = [
             'DESPACHO DEL ALCALDE',
@@ -63,7 +39,7 @@ class DatabaseSeeder extends Seeder
             );
         }
 
-        $despacho = Dependencia::where('descripcion', 'ADMIN')->first();
+        // $despacho = Dependencia::where('descripcion', 'ADMIN')->first();
 
         // Tipos de Correspondencia
         $tipos = [
@@ -148,7 +124,6 @@ class DatabaseSeeder extends Seeder
                 'name'           => 'Administrador Sistema',
                 'password'       => Hash::make('Admin2026*'),
                 'role_id'        => $adminRole?->id,
-                'dependencia_id' => $despacho->id,
                 'activo'         => true,
             ]
         );
@@ -159,7 +134,6 @@ class DatabaseSeeder extends Seeder
                 'name'           => 'Operador Radicación',
                 'password'       => Hash::make('Operador2026*'),
                 'role_id'        => $operRole?->id,
-                'dependencia_id' => $despacho->id,
                 'activo'         => true,
             ]
         );

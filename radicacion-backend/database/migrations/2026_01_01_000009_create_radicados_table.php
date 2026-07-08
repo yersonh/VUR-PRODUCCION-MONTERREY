@@ -25,8 +25,8 @@ return new class extends Migration
             $table->enum('tipo_remitente', ['PACIENTE', 'FUNCIONARIO', 'TERCERO_NIT']);
             $table->foreignId('tercero_id')->nullable()->constrained('terceros');
             $table->foreignId('paciente_id')->nullable()->constrained('pacientes');
-            $table->foreignId('funcionario_id')->nullable()->constrained('personal');
-            $table->foreignId('dependencia_remitente_id')->nullable()->constrained('dependencias');
+            $table->unsignedBigInteger('funcionario_id')->nullable();
+            $table->unsignedBigInteger('dependencia_remitente_id')->nullable();
             $table->string('nombre_persona_empresa', 100)->nullable();
 
             // Tipo correspondencia
@@ -36,8 +36,8 @@ return new class extends Migration
             $table->date('fecha_limite')->nullable();
 
             // Destino
-            $table->foreignId('dependencia_destino_id')->constrained('dependencias');
-            $table->foreignId('personal_destino_id')->nullable()->constrained('personal');
+            $table->unsignedBigInteger('dependencia_destino_id');
+            $table->unsignedBigInteger('personal_destino_id')->nullable();
 
             // Físico / Anexos
             $table->unsignedSmallInteger('folios')->nullable();
