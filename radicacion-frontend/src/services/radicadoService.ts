@@ -71,6 +71,18 @@ const radicadoService = {
   anular: async (id: number, motivo: string): Promise<void> => {
     await api.patch(`/radicados/${id}/anular`, { motivo })
   },
+
+  agregarAnexos: async (id: number, formData: FormData): Promise<Radicado> => {
+    const res = await api.post<{ data: Radicado }>(`/radicados/${id}/anexos`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return res.data.data
+  },
+
+  eliminarAnexo: async (id: number, documentoId: number): Promise<Radicado> => {
+    const res = await api.delete<{ data: Radicado }>(`/radicados/${id}/anexos/${documentoId}`)
+    return res.data.data
+  },
 }
 
 export default radicadoService

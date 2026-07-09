@@ -123,6 +123,7 @@ export interface RadicadoActuacion {
 export interface AnexoItem {
   descripcion: string
   tipo_id: number | null
+  documento_id?: number | null
 }
 
 export interface Radicado {

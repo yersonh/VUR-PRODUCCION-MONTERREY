@@ -7,6 +7,7 @@ import {
   ArrowLeftIcon, PencilSquareIcon, DocumentArrowDownIcon,
   ArrowPathIcon, NoSymbolIcon, CheckCircleIcon,
   ClockIcon, DocumentCheckIcon, SparklesIcon,
+  TrashIcon, PaperClipIcon,
 } from '@heroicons/react/24/outline'
 import { motion } from 'framer-motion'
 
@@ -219,6 +220,12 @@ export default function RadicadoDetalle() {
   const [subiendoPdfSalida, setSubiendoPdfSalida] = useState(false)
   const [pdfSalida, setPdfSalida] = useState<File | null>(null)
 
+  const [nuevoAnexoDescripcion, setNuevoAnexoDescripcion] = useState('')
+  const [nuevoAnexoTipoId, setNuevoAnexoTipoId] = useState<number | null>(null)
+  const [nuevoAnexoArchivo, setNuevoAnexoArchivo] = useState<File | null>(null)
+  const [agregandoAnexo, setAgregandoAnexo] = useState(false)
+  const [eliminandoAnexoId, setEliminandoAnexoId] = useState<number | null>(null)
+
   const esAdmin = user?.role?.nombre === 'ADMIN'
 
   useEffect(() => {
@@ -283,6 +290,41 @@ export default function RadicadoDetalle() {
     }
   }
 
+  const handleAgregarAnexo = async () => {
+    if (!radicado || !nuevoAnexoDescripcion.trim()) return
+    setAgregandoAnexo(true)
+    try {
+      const fd = new FormData()
+      fd.append('anexos[0][descripcion]', nuevoAnexoDescripcion.trim())
+      if (nuevoAnexoTipoId) fd.append('anexos[0][tipo_id]', String(nuevoAnexoTipoId))
+      if (nuevoAnexoArchivo) fd.append('anexos[0][archivo]', nuevoAnexoArchivo)
+      const actualizado = await radicadoService.agregarAnexos(radicado.id, fd)
+      setRadicado(actualizado)
+      setNuevoAnexoDescripcion('')
+      setNuevoAnexoTipoId(null)
+      setNuevoAnexoArchivo(null)
+      toast.success('Anexo agregado')
+    } catch {
+      toast.error('Error al agregar el anexo')
+    } finally {
+      setAgregandoAnexo(false)
+    }
+  }
+
+  const handleEliminarAnexo = async (documentoId: number) => {
+    if (!radicado) return
+    setEliminandoAnexoId(documentoId)
+    try {
+      const actualizado = await radicadoService.eliminarAnexo(radicado.id, documentoId)
+      setRadicado(actualizado)
+      toast.success('Anexo eliminado')
+    } catch {
+      toast.error('Error al eliminar el anexo')
+    } finally {
+      setEliminandoAnexoId(null)
+    }
+  }
+
   const formatFecha = (f?: string) => {
     if (!f) return '—'
     try { return format(parseISO(f), 'dd/MM/yyyy', { locale: es }) }
@@ -303,6 +345,7 @@ export default function RadicadoDetalle() {
   const estadoActual = radicado?.estado?.codigo as EstadoRadicado | undefined
   const puedeAnular = esAdmin && estadoActual && !['CERRADO', 'ANULADO'].includes(estadoActual)
   const puedeCambiarEstado = estadoActual && TRANSICIONES[estadoActual]?.length > 0
+  const puedeEditarAnexos = estadoActual && !['CERRADO', 'ANULADO'].includes(estadoActual)
   const tienePdfEntrada = (radicado?.documentos ?? []).some(d => d.tipo === 'ENTRADA')
   const tienePdfSalida = (radicado?.documentos ?? []).some(d => d.tipo === 'SALIDA')
 
@@ -469,7 +512,7 @@ export default function RadicadoDetalle() {
                       {radicado.anexos.map((item, i) => (
                         <li key={i} className="flex items-start gap-2 text-sm">
                           <span className="text-[#2B5BA8] font-semibold shrink-0 mt-0.5">{i + 1}.</span>
-                          <div className="flex flex-col gap-0.5">
+                          <div className="flex-1 flex flex-col gap-0.5">
                             <span className="text-slate-700">{item.descripcion}</span>
                             {item.tipo_id && (
                               <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wide">
@@ -477,6 +520,28 @@ export default function RadicadoDetalle() {
                               </span>
                             )}
                           </div>
+                          {item.documento_id && (
+                            <a
+                              href={`/api/v1/radicados/${radicado.id}/documentos/${item.documento_id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-1 text-[#2B5BA8] hover:text-[#1B3A6E] transition-colors shrink-0"
+                              title="Descargar anexo"
+                            >
+                              <DocumentArrowDownIcon className="w-4 h-4" />
+                            </a>
+                          )}
+                          {item.documento_id && puedeEditarAnexos && (
+                            <button
+                              type="button"
+                              onClick={() => item.documento_id && handleEliminarAnexo(item.documento_id)}
+                              disabled={eliminandoAnexoId === item.documento_id}
+                              className="p-1 text-red-500 hover:text-red-700 transition-colors shrink-0 disabled:opacity-40"
+                              title="Eliminar anexo"
+                            >
+                              <TrashIcon className="w-4 h-4" />
+                            </button>
+                          )}
                         </li>
                       ))}
                     </ul>
@@ -486,6 +551,49 @@ export default function RadicadoDetalle() {
                     <Campo label="Cantidad Anexos" value={radicado.cantidad_anexos} />
                   </div>
                 ) : null}
+
+                {/* Agregar anexo nuevo */}
+                {puedeEditarAnexos && (
+                  <div className="mt-3 p-3 bg-slate-50 border border-dashed border-slate-300 rounded-xl space-y-2">
+                    <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
+                      <PaperClipIcon className="w-3.5 h-3.5" /> Agregar anexo
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <input
+                        type="text"
+                        value={nuevoAnexoDescripcion}
+                        onChange={e => setNuevoAnexoDescripcion(e.target.value)}
+                        placeholder="Descripción del anexo"
+                        maxLength={150}
+                        className="sm:col-span-1 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#2B5BA8]"
+                      />
+                      <select
+                        value={nuevoAnexoTipoId ?? ''}
+                        onChange={e => setNuevoAnexoTipoId(e.target.value ? Number(e.target.value) : null)}
+                        className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#2B5BA8]"
+                      >
+                        <option value="">Tipo de anexo...</option>
+                        {tiposAnexo.map(t => (
+                          <option key={t.id} value={t.id}>{t.descripcion}</option>
+                        ))}
+                      </select>
+                      <input
+                        type="file"
+                        accept="application/pdf"
+                        onChange={e => setNuevoAnexoArchivo(e.target.files?.[0] ?? null)}
+                        className="text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-blue-50 file:text-[#2B5BA8] hover:file:bg-blue-100"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAgregarAnexo}
+                      disabled={!nuevoAnexoDescripcion.trim() || agregandoAnexo}
+                      className="px-4 py-1.5 bg-[#2B5BA8] hover:bg-[#1B3A6E] text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+                    >
+                      {agregandoAnexo ? 'Agregando...' : '+ Agregar anexo'}
+                    </button>
+                  </div>
+                )}
               </Seccion>
 
               {radicado.observaciones && (

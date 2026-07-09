@@ -55,6 +55,13 @@ class RadicadoService
             $año  = now()->year;
             $hoy  = Carbon::now();
 
+            // Los anexos pueden traer un archivo PDF (UploadedFile) por item; se
+            // guardan aparte como RadicadoDocumento tipo ANEXO y se quitan del
+            // array antes del create() para no meter un UploadedFile en la
+            // columna JSON 'anexos'.
+            $anexosInput = $datos['anexos'] ?? [];
+            unset($datos['anexos']);
+
             // Calcular fecha límite
             $tipoCorr = TipoCorrespondencia::findOrFail($datos['tipo_correspondencia_id']);
             $fechaLimite = $tipoCorr->max_dias > 0
@@ -81,6 +88,9 @@ class RadicadoService
             }
             if ($pdfSalida) {
                 $this->adjuntarPdf($radicado, $pdfSalida, 'SALIDA', $operadorId);
+            }
+            if (!empty($anexosInput)) {
+                $radicado->update(['anexos' => $this->guardarAnexos($radicado, $anexosInput, $operadorId)]);
             }
 
             // Actuación inicial
@@ -164,7 +174,72 @@ class RadicadoService
         return $radicado->fresh($this->relaciones());
     }
 
+    /**
+     * Agrega uno o más anexos (PDF) a un radicado ya creado.
+     */
+    public function agregarAnexos(Radicado $radicado, array $anexosInput, int $usuarioId): Radicado
+    {
+        return DB::transaction(function () use ($radicado, $anexosInput, $usuarioId) {
+            $nuevos   = $this->guardarAnexos($radicado, $anexosInput, $usuarioId);
+            $actuales = $radicado->anexos ?? [];
+
+            $radicado->update(['anexos' => [...$actuales, ...$nuevos]]);
+
+            return $radicado->fresh($this->relaciones());
+        });
+    }
+
+    /**
+     * Elimina un anexo (documento PDF + su entrada en el JSON 'anexos').
+     */
+    public function eliminarAnexo(Radicado $radicado, int $documentoId): Radicado
+    {
+        DB::transaction(function () use ($radicado, $documentoId) {
+            $documento = $radicado->documentos()
+                ->where('id', $documentoId)
+                ->where('tipo', 'ANEXO')
+                ->first();
+
+            if (!$documento) {
+                return;
+            }
+
+            $this->pdfStorage->eliminar($documento->ruta_almacenamiento);
+            $documento->delete();
+
+            $actuales = collect($radicado->anexos ?? [])
+                ->reject(fn (array $a) => ($a['documento_id'] ?? null) === $documentoId)
+                ->values()
+                ->all();
+
+            $radicado->update(['anexos' => $actuales]);
+        });
+
+        return $radicado->fresh($this->relaciones());
+    }
+
     // ── Privados ────────────────────────────────────────────────────
+
+    // Guarda el PDF de cada anexo que traiga archivo (RadicadoDocumento tipo
+    // ANEXO) y devuelve el array listo para la columna JSON 'anexos', con
+    // 'documento_id' enlazado para poder descargar/eliminar cada uno después.
+    private function guardarAnexos(Radicado $radicado, array $anexosInput, int $usuarioId): array
+    {
+        return collect($anexosInput)->map(function (array $item) use ($radicado, $usuarioId) {
+            $archivo     = $item['archivo'] ?? null;
+            $documentoId = null;
+
+            if ($archivo instanceof UploadedFile) {
+                $documentoId = $this->adjuntarPdf($radicado, $archivo, 'ANEXO', $usuarioId)->id;
+            }
+
+            return [
+                'descripcion'  => $item['descripcion'] ?? '',
+                'tipo_id'      => $item['tipo_id'] ?? null,
+                'documento_id' => $documentoId,
+            ];
+        })->all();
+    }
 
     private function adjuntarPdf(Radicado $radicado, UploadedFile $file, string $tipo, int $subidoPor): RadicadoDocumento
     {

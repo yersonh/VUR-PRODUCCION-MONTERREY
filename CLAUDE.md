@@ -55,17 +55,33 @@ The main domain entity is `Radicado` — a correspondence record with soft delet
 
 Expected `EstadoCorrespondencia` codes (seeded): `RADICADO`, `EN_TRAMITE`, `RESPONDIDO`, `CERRADO`, `ANULADO`. `RADICADO` is always the initial status on creation.
 
-Catalogs (read-only in normal use): `TipoCorrespondencia`, `TipoIdentificacion`, `TipoAnexo`, `AuxTip`, `MedioIngreso`, `EstadoCorrespondencia`, `Dependencia`.
+Local catalogs (own tables, read-only in normal use): `TipoCorrespondencia`, `TipoAnexo`, `AuxTip` (optionally scoped to a `TipoCorrespondencia` via nullable `tipo_correspondencia_id`), `MedioIngreso`, `EstadoCorrespondencia`.
 
-External parties linked to radicados: `Tercero` (categoria: `EMPRESA` | `CIUDADANO`, with `TerceroContacto` sub-records) and `Personal` (municipal staff).
+### Core Institucional integration
+
+VUR does **not** own its master data for people/companies/departments — that data lives in a separate system, the **Core Institucional** (a different Laravel API, reachable at `CORE_API_URL` with a Bearer token in `CORE_API_TOKEN`). All access goes through `app/Services/ClienteCore.php`; never query these as local Eloquent models — the corresponding tables and models (`Personal`, `Dependencia`, `TipoIdentificacion`) were removed from VUR.
+
+- **Dependencias** and **tipos de identificación**: read-only catalogs from the Core (`ClienteCore::dependencias()`, cached 5 min; `tiposIdentificacion()`, cached 1 hour). The Core's field is `nombre`, not `descripcion` — controllers remap it before returning JSON to keep the frontend's `Dependencia { descripcion }` shape.
+- **Funcionarios** (`funcionario_id`/`personal_destino_id` columns on `Radicado` and elsewhere): fetched/created via `ClienteCore::funcionario()`/`crearFuncionarioConPersona()`. A funcionario wraps a `persona` (identification/contact data) + a `dependencia_id`/`cargo`.
+- **Ciudadanos** and **empresas** (the two `Tercero.categoria` values): fetched/created via `ClienteCore::ciudadano()`/`empresa()` and `crearCiudadano()`/`crearEmpresa()`.
+- **`Tercero`** is now a thin local bridge table — `{id, codigo, categoria, core_id}` — not a data table. It exists only so `Radicado.tercero_id`/`tercero_destino_id` have a stable local FK to point to; the actual name/NIT/email etc. are always fetched live from the Core (`TerceroController`/`RadicadoService::terceroInfo()` do a find-or-create on this bridge table keyed by `{categoria, core_id}`). `TerceroContacto` (a contact person for an EMPRESA, e.g. "who to address correspondence to") is VUR-only — the Core has no such concept — and references the Core's `empresa_id` directly (no local FK).
+- Columns like `funcionario_id`, `personal_destino_id`, `dependencia_remitente_id`, `dependencia_destino_id` on `Radicado`/`User`/etc. are **plain integer columns, not FKs** — they hold the Core's own id. Look at `RadicadoService`'s `dependenciaInfo()`/`funcionarioInfo()`/`terceroInfo()` helpers for the pattern to resolve them into display data; don't add an Eloquent `belongsTo` for them.
+
+**Known Core API limitations** (don't assume otherwise without checking with whoever owns the Core):
+- No free-text search on `funcionarios`/`ciudadanos`/`empresas`/`personas` — only exact filters (`nit`, or `tipo_identificacion_id`+`numero_identificacion` together for personas/ciudadanos). Controllers that need "search as you type" (e.g. `PersonalController`, `TerceroController`) fetch a page and filter client-side in PHP — this only searches within that page, not the whole dataset.
+- `dependencias` has no update or activate/deactivate endpoint. `funcionarios` has no activate/deactivate endpoint either. Controllers return `501` with an explanation rather than pretending these work.
+- Creating a funcionario/ciudadano requires a two-step Core flow (find-or-create the `persona`/base record, then create the funcionario/ciudadano pointing at it) — see `ClienteCore::crearFuncionarioConPersona()`.
 
 ### Environment
 
 Copy `.env.example` to `.env`. Key vars:
 - `DB_CONNECTION=pgsql` (or `sqlite` for local dev)
+- `CORE_API_URL` / `CORE_API_TOKEN` — required for the Core Institucional integration above; without them, `ClienteCore` throws on construction (its `$token` property is a non-nullable `string`) and every controller that injects it 500s
 - `GEMINI_API_KEY` — required for AI PDF analysis
 - `BREVO_API_KEY` — required for email notifications
 - `FRONTEND_URL` — used by CORS and Sanctum stateful domains
+
+On Windows, outbound HTTPS calls from PHP (Gemini, Brevo, the Core) fail with a cURL SSL error unless `curl.cainfo`/`openssl.cafile` are set in `php.ini` to a CA bundle (e.g. the one from https://curl.se/ca/cacert.pem) — PHP on Windows doesn't fall back to the OS cert store the way Linux builds do.
 
 ## Frontend (`radicacion-frontend/`)
 

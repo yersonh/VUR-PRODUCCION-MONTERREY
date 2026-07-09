@@ -64,9 +64,12 @@ Route::prefix('v1')->group(function () {
         Route::post('radicados',                   [RadicadoController::class, 'store']);
         Route::get('radicados/{id}',               [RadicadoController::class, 'show']);
         Route::post('radicados/{id}',              [RadicadoController::class, 'update']);   // multipart PUT simulado
+        Route::post('radicados/{id}/anexos',       [RadicadoController::class, 'agregarAnexos']);
+        Route::delete('radicados/{id}/anexos/{documentoId}', [RadicadoController::class, 'eliminarAnexo']);
         Route::patch('radicados/{id}/estado',      [RadicadoController::class, 'cambiarEstado']);
         Route::patch('radicados/{id}/anular',      [RadicadoController::class, 'anular']);
         Route::get('radicados/{id}/pdf/{tipo}',    [RadicadoController::class, 'descargarPdf']);
+        Route::get('radicados/{id}/documentos/{documentoId}', [RadicadoController::class, 'descargarDocumento']);
 
         // ── Admin — solo rol ADMIN ───────────────────────────────
         Route::middleware('admin')->prefix('admin')->group(function () {

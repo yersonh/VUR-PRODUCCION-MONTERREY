@@ -160,11 +160,13 @@ export default function RadicadoNuevo() {
   const [enviandoRadicado, setEnviandoRadicado] = useState(false)
 
   // ── Lista dinámica de anexos ──────────────────────────────────────
-  const [anexosItems, setAnexosItems] = useState<{ descripcion: string; tipo_id: number | null }[]>([])
-  const syncAnexos = (items: { descripcion: string; tipo_id: number | null }[]) => {
+  // 'archivo' se maneja fuera de react-hook-form (igual que pdfEntrada/pdfSalida)
+  // y se cruza por índice con el subconjunto filtrado al armar el FormData.
+  const [anexosItems, setAnexosItems] = useState<{ descripcion: string; tipo_id: number | null; archivo: File | null }[]>([])
+  const syncAnexos = (items: { descripcion: string; tipo_id: number | null; archivo: File | null }[]) => {
     setAnexosItems(items)
     const limpios = items.filter(i => i.descripcion.trim() !== '')
-    setValue('anexos', limpios.length > 0 ? limpios : null)
+    setValue('anexos', limpios.length > 0 ? limpios.map(({ descripcion, tipo_id }) => ({ descripcion, tipo_id })) : null)
     setValue('cantidad_anexos', limpios.length > 0 ? limpios.length : null)
   }
 
@@ -660,12 +662,12 @@ export default function RadicadoNuevo() {
       if (campos.tiene_anexos === true) {
         setTieneAnexos(true)
         if (campos.descripcion_anexos && campos.descripcion_anexos.length > 0) {
-          syncAnexos(campos.descripcion_anexos.map(d => ({ descripcion: d, tipo_id: null })))
+          syncAnexos(campos.descripcion_anexos.map(d => ({ descripcion: d, tipo_id: null, archivo: null })))
           aplicados.push({ label: 'Anexos', valor: `${campos.descripcion_anexos.length} detectado(s)` })
         }
       } else if (campos.tiene_anexos === false) {
         setTieneAnexos(false)
-        syncAnexos([]as { descripcion: string; tipo_id: number | null }[])
+        syncAnexos([])
         aplicados.push({ label: 'Anexos', valor: 'Sin anexos' })
       }
       if (campos.medio_probable) {
@@ -718,9 +720,14 @@ export default function RadicadoNuevo() {
       Object.entries(values).forEach(([k, v]) => {
         if (v == null) return
         if (k === 'anexos' && Array.isArray(v)) {
-          (v as { descripcion: string; tipo_id: number | null }[]).forEach((item, i) => {
+          // 'archivo' no viaja en el valor de react-hook-form (solo descripcion/
+          // tipo_id); se cruza por índice con anexosItems filtrado igual que en
+          // syncAnexos() para saber qué archivo corresponde a cada anexo.
+          const archivos = anexosItems.filter(i => i.descripcion.trim() !== '')
+          ;(v as { descripcion: string; tipo_id: number | null }[]).forEach((item, i) => {
             formData.append(`anexos[${i}][descripcion]`, item.descripcion)
             if (item.tipo_id != null) formData.append(`anexos[${i}][tipo_id]`, String(item.tipo_id))
+            if (archivos[i]?.archivo) formData.append(`anexos[${i}][archivo]`, archivos[i].archivo)
           })
         } else if (Array.isArray(v)) {
           ;(v as unknown as string[]).forEach(item => formData.append(`${k}[]`, item))
@@ -1525,7 +1532,7 @@ export default function RadicadoNuevo() {
                     </span>
                     <button
                       type="button"
-                      onClick={() => syncAnexos([...anexosItems, { descripcion: '', tipo_id: null }])}
+                      onClick={() => syncAnexos([...anexosItems, { descripcion: '', tipo_id: null, archivo: null }])}
                       className="text-xs text-[#2B5BA8] hover:text-[#1B3A6E] font-medium flex items-center gap-1 transition-colors"
                     >
                       + Agregar anexo
@@ -1542,7 +1549,7 @@ export default function RadicadoNuevo() {
                     {anexosItems.map((item, idx) => (
                       <div key={idx} className="flex items-start gap-2">
                         <span className="text-xs text-slate-400 font-semibold w-4 shrink-0 text-right mt-2">{idx + 1}.</span>
-                        <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                        <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-1.5">
                           <input
                             type="text"
                             value={item.descripcion}
@@ -1569,6 +1576,16 @@ export default function RadicadoNuevo() {
                               <option key={t.id} value={t.id}>{t.descripcion}</option>
                             ))}
                           </select>
+                          <input
+                            type="file"
+                            accept="application/pdf"
+                            onChange={e => {
+                              const updated = [...anexosItems]
+                              updated[idx] = { ...updated[idx], archivo: e.target.files?.[0] ?? null }
+                              syncAnexos(updated)
+                            }}
+                            className="text-xs text-slate-500 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-blue-50 file:text-[#2B5BA8] hover:file:bg-blue-100"
+                          />
                         </div>
                         <button
                           type="button"

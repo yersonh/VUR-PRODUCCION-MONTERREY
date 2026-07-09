@@ -174,6 +174,31 @@ class RadicadoController extends Controller
         return response()->json(['data' => $this->formatDetalle($radicado)]);
     }
 
+    // ── POST /radicados/{id}/anexos — agregar anexos después de creado ──
+    public function agregarAnexos(Request $request, int $id): JsonResponse
+    {
+        $data = $request->validate([
+            'anexos'               => ['required', 'array', 'min:1', 'max:20'],
+            'anexos.*.descripcion' => ['required', 'string', 'max:150'],
+            'anexos.*.tipo_id'     => ['nullable', 'integer', 'exists:tipos_anexo,id'],
+            'anexos.*.archivo'     => ['nullable', 'file', 'mimes:pdf', 'max:20480'],
+        ]);
+
+        $radicado    = Radicado::findOrFail($id);
+        $actualizado = $this->service->agregarAnexos($radicado, $data['anexos'], $request->user()->id);
+
+        return response()->json(['data' => $this->formatDetalle($actualizado)]);
+    }
+
+    // ── DELETE /radicados/{id}/anexos/{documentoId} ────────────────
+    public function eliminarAnexo(int $id, int $documentoId): JsonResponse
+    {
+        $radicado    = Radicado::findOrFail($id);
+        $actualizado = $this->service->eliminarAnexo($radicado, $documentoId);
+
+        return response()->json(['data' => $this->formatDetalle($actualizado)]);
+    }
+
     // ── PATCH /radicados/{id}/estado ──────────────────────────────
     public function cambiarEstado(Request $request, int $id): JsonResponse
     {
@@ -250,6 +275,28 @@ class RadicadoController extends Controller
         );
     }
 
+    // ── GET /radicados/{id}/documentos/{documentoId} — descarga genérica
+    //     (usada para anexos individuales; ENTRADA/SALIDA siguen usando
+    //     descargarPdf() de arriba porque el frontend ya lo consume así)
+    public function descargarDocumento(int $id, int $documentoId): mixed
+    {
+        $radicado  = Radicado::with('documentos')->findOrFail($id);
+        $documento = $radicado->documentos->firstWhere('id', $documentoId);
+
+        abort_unless($documento, 404, 'Documento no encontrado');
+
+        $ruta = $documento->ruta_almacenamiento;
+        abort_unless(Storage::disk('local')->exists($ruta), 404, 'Archivo no encontrado en disco');
+
+        return response()->file(
+            Storage::disk('local')->path($ruta),
+            [
+                'Content-Type'        => 'application/pdf',
+                'Content-Disposition' => "inline; filename=\"{$documento->nombre_original}\"",
+            ]
+        );
+    }
+
     // ── Helpers ────────────────────────────────────────────────────
     private function reglasValidacion(): array
     {
@@ -281,6 +328,7 @@ class RadicadoController extends Controller
             'anexos'                  => ['nullable', 'array', 'max:20'],
             'anexos.*.descripcion'    => ['required_with:anexos', 'string', 'max:150'],
             'anexos.*.tipo_id'        => ['nullable', 'integer', 'exists:tipos_anexo,id'],
+            'anexos.*.archivo'        => ['nullable', 'file', 'mimes:pdf', 'max:20480'],
             'nro_factura'             => ['nullable', 'string', 'max:30'],
             'valor_factura'           => ['nullable', 'numeric', 'min:0'],
             'fecha_documento'         => ['nullable', 'date'],

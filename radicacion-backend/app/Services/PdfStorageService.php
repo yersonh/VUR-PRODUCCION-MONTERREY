@@ -12,7 +12,9 @@ class PdfStorageService
     {
         $nroPadded = str_pad($nro, 6, '0', STR_PAD_LEFT);
         $directorio = "radicados/{$año}/{$nroPadded}";
-        $nombreArchivo = strtolower($tipo) . '_' . time() . '.pdf';
+        // uniqid() evita choques cuando se suben varios anexos en el mismo
+        // segundo (ENTRADA/SALIDA son únicos por radicado, pero ANEXO no).
+        $nombreArchivo = strtolower($tipo) . '_' . time() . '_' . uniqid() . '.pdf';
 
         // Almacena en disk 'local' (apunta a storage/app)
         // En Railway, el volume está montado en /app/storage
