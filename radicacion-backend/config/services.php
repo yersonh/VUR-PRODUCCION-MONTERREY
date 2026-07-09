@@ -27,6 +27,13 @@ return [
         'url'   => env('CORE_API_URL'),
         'token' => env('CORE_API_TOKEN'),
     ],
+    // ── CDR (Certificado de Residencia Digital) — envío directo (peer-to-peer,
+    //    sin pasar por el Core) de solicitudes de Carta de Residencia ──
+    'cdr' => [
+        'url'                                 => env('CDR_API_URL'),
+        'token'                               => env('CDR_API_TOKEN'),
+        'tipo_correspondencia_residencia_id'  => env('VUR_TIPO_CORRESPONDENCIA_RESIDENCIA_ID', 90),
+    ],
     // ── Brevo (correos transaccionales vía API REST) ───────────────
     'brevo' => [
         'api_key'    => env('BREVO_API_KEY'),

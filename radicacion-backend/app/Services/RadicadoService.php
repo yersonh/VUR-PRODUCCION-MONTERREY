@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Jobs\EnviarSolicitudResidenciaACdr;
 use App\Models\EstadoCorrespondencia;
 use App\Models\Radicado;
 use App\Models\RadicadoActuacion;
@@ -105,6 +106,18 @@ class RadicadoService
             // Analizar PDF con IA si existe
             if ($pdfEntrada) {
                 $this->procesarIaAsync($radicado, $pdfEntrada);
+            }
+
+            // Envío automático a CDR (peer-to-peer) si es una solicitud de
+            // Carta de Residencia. En cola y afterCommit() para no enviar
+            // nada si esta transacción termina fallando.
+            // NOTA: ->afterCommit() difiere la ejecución del Job hasta que
+            // esta transacción hace commit — eso ocurre dentro del propio
+            // DB::transaction(), no aquí, así que un try/catch en este punto
+            // no alcanza a atrapar el fallo del Job (ver manejo de errores
+            // dentro de EnviarSolicitudResidenciaACdr::handle()).
+            if ((int) $radicado->tipo_correspondencia_id === (int) config('services.cdr.tipo_correspondencia_residencia_id')) {
+                EnviarSolicitudResidenciaACdr::dispatch($radicado->id)->afterCommit();
             }
 
             // Notificar a la dependencia destino (sistema interno)
