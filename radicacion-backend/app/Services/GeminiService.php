@@ -84,7 +84,14 @@ PROMPT;
             ]],
             'generationConfig' => [
                 'temperature'      => 0.1,
-                'maxOutputTokens'  => 2048,
+                // 2048 se quedaba corto: gemini-2.5-flash gasta parte del
+                // presupuesto de tokens en "thinking" interno antes de
+                // generar el JSON, y con ~20 campos pedidos el JSON salía
+                // cortado a la mitad (json_decode fallaba silenciosamente).
+                // thinkingBudget=0 desactiva ese thinking para dejarle todo
+                // el presupuesto a la respuesta real.
+                'maxOutputTokens'  => 4096,
+                'thinkingConfig'   => ['thinkingBudget' => 0],
                 'responseMimeType' => 'application/json',
             ],
         ];
@@ -113,12 +120,18 @@ PROMPT;
                     return "Error de Gemini API ({$response->status()}): {$msg}";
                 }
 
-                $text = $response->json('candidates.0.content.parts.0.text', '');
-                $data = $this->parseJson($text);
+                $text         = $response->json('candidates.0.content.parts.0.text', '');
+                $finishReason = $response->json('candidates.0.finishReason');
+                $data         = $this->parseJson($text);
 
                 if (! is_array($data)) {
-                    Log::error('GeminiService: respuesta no es JSON', ['raw' => substr($text, 0, 500)]);
-                    return 'Gemini no devolvió un JSON válido.';
+                    Log::error('GeminiService: respuesta no es JSON', [
+                        'finishReason' => $finishReason,
+                        'raw'          => substr($text, 0, 500),
+                    ]);
+                    return $finishReason === 'MAX_TOKENS'
+                        ? 'Gemini cortó la respuesta por límite de tokens.'
+                        : 'Gemini no devolvió un JSON válido.';
                 }
 
                 return $data;

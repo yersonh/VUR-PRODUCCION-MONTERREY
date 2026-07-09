@@ -94,17 +94,29 @@ export function CrearTerceroModal({ open, onClose, onCreado, defaultValues }: Pr
 
   useEffect(() => {
     if (open) {
+      // 'defaultValues.nombres' trae el nombre completo detectado por la IA.
+      // Si el tipo de identificación precargado es NIT, es el nombre de la
+      // empresa (va a razon_social). Si es cualquier otro tipo (persona
+      // natural), hay que repartirlo en nombres/primer_apellido — si no, el
+      // nombre detectado se perdía silenciosamente y el operador tenía que
+      // volver a escribirlo a mano.
+      const tipoDefault  = tiposIdentificacion.find(t => t.id === defaultValues?.tipo_identificacion_id)
+      const esNITDefault = tipoDefault?.codigo?.toUpperCase() === 'NIT'
+      const partes        = (!esNITDefault ? defaultValues?.nombres ?? '' : '').trim().split(/\s+/).filter(Boolean)
+      const nombresPersona = partes.length > 0 ? partes.slice(0, Math.max(1, partes.length - 1)).join(' ') : ''
+      const apellidoPersona = partes.length > 1 ? partes[partes.length - 1] : ''
+
       reset({
         tipo_identificacion_id: defaultValues?.tipo_identificacion_id ?? 0,
         nro_identificacion:     defaultValues?.nro_identificacion ?? '',
-        razon_social:           defaultValues?.nombres ?? '',
+        razon_social:           esNITDefault ? (defaultValues?.nombres ?? '') : '',
         nombre_contacto:        defaultValues?.nombre_contacto ?? '',
         apellido_contacto: '', cargo_contacto: '', email_contacto: '',
-        nombres: '', primer_apellido: '', segundo_apellido: '',
+        nombres: nombresPersona, primer_apellido: apellidoPersona, segundo_apellido: '',
         direccion: '', municipio: '', telefono: '', email: '',
       })
     }
-  }, [open, reset, defaultValues])
+  }, [open, reset, defaultValues, tiposIdentificacion])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }

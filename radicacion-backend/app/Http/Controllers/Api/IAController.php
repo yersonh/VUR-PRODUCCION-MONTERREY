@@ -13,6 +13,13 @@ class IAController extends Controller
 
     public function analizarPdf(Request $request): JsonResponse
     {
+        // GeminiService reintenta hasta 5 veces con esperas de hasta 30s entre
+        // cada una (además del timeout de 60s por intento vía Guzzle). El
+        // límite por defecto de PHP (30s) mataba el proceso a medias antes de
+        // terminar de responder, lo que el navegador reportaba como error de
+        // CORS (la respuesta abortada nunca llevaba las cabeceras CORS).
+        set_time_limit(180);
+
         $request->validate([
             'pdf' => ['required', 'file', 'mimes:pdf', 'max:20480'],
         ]);
