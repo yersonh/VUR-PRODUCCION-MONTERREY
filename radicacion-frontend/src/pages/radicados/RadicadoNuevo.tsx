@@ -551,12 +551,20 @@ export default function RadicadoNuevo() {
     if (campos.tipo_destinatario === 'INTERNO') {
       setValue('tipo_destino', 'INTERNO')
       const depNombre = norm(campos.dependencia_destino ?? '')
-      const dep = depNombre
+      let dep = depNombre
         ? useCatalogoStore.getState().dependencias.find(d => {
             const n = norm(d.descripcion)
             return n.includes(depNombre) || depNombre.includes(n)
           })
         : undefined
+      // Respaldo: si es una solicitud de carta de residencia y no hay una
+      // dependencia específica (el prompt ya le pide a Gemini usar "Despacho
+      // del Alcalde" en ese caso, pero por si no lo sigue al pie de la letra
+      // — solo el Alcalde despacha esas solicitudes, y no aplica para otros
+      // tipos de documento).
+      if (!dep && campos.es_solicitud_residencia) {
+        dep = useCatalogoStore.getState().dependencias.find(d => norm(d.descripcion).includes('despacho del alcalde'))
+      }
       if (!dep) { setDestinoNoRegistrado(campos); return }
       setValue('dependencia_destino_id', dep.id)
       setDisplayField({ descripcionDepDestino: dep.descripcion })
@@ -1435,9 +1443,14 @@ export default function RadicadoNuevo() {
                           const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
                           const depNombre = norm(destinoNoRegistrado.dependencia_destino ?? '')
                           const allDeps = useCatalogoStore.getState().dependencias
-                          const depEncontrada = depNombre
+                          let depEncontrada = depNombre
                             ? allDeps.find(d => { const n = norm(d.descripcion ?? ''); return n.includes(depNombre) || depNombre.includes(n) })
                             : undefined
+                          // Mismo respaldo que en buscarDestinoIA: solicitud de
+                          // residencia sin dependencia específica → Despacho del Alcalde.
+                          if (!depEncontrada && destinoNoRegistrado.es_solicitud_residencia) {
+                            depEncontrada = allDeps.find(d => norm(d.descripcion ?? '').includes('despacho del alcalde'))
+                          }
                           setFuncionarioDefaults({
                             nombres,
                             apellidos,

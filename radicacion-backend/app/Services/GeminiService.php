@@ -73,6 +73,8 @@ Extrae estos campos:
 - dependencia_destino: nombre de la secretaría, oficina o área a la que va dirigido el documento, solo si tipo_destinatario es "INTERNO". null en los demás casos.
 - nombre_empresa_destino: nombre de la entidad o empresa destino, solo si tipo_destinatario es "EMPRESA". null en los demás casos.
 - cargo_destinatario: cargo del destinatario si aparece (ej: "Secretario de Despacho", "Licenciado"). null si no aparece.
+- es_solicitud_residencia: true si el documento es una solicitud de carta/constancia de residencia (el remitente pide que se le expida una carta certificando que reside en el municipio, usualmente para un trámite, postulación laboral o similar). false en cualquier otro caso.
+    Si es_solicitud_residencia es true y el documento está dirigido de forma genérica a "la Alcaldía de Monterrey Casanare" / "Alcaldía Municipal" sin nombrar una secretaría, oficina o dependencia específica, usa dependencia_destino = "Despacho del Alcalde" (solo el Alcalde despacha esas solicitudes; NO apliques esta regla para otros tipos de documento — si no es solicitud de residencia y no hay dependencia específica mencionada, deja dependencia_destino en null).
 PROMPT;
 
         $payload = [

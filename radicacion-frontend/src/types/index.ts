@@ -217,4 +217,5 @@ export interface IACamposSugeridos {
   dependencia_destino?: string | null
   nombre_empresa_destino?: string | null
   cargo_destinatario?: string | null
+  es_solicitud_residencia?: boolean
 }
