@@ -368,6 +368,19 @@ class RadicadoService
 
         $esEmpresa = $tercero->categoria === 'EMPRESA';
 
+        // tipo_documento: el Core solo guarda tipo_identificacion_id numérico;
+        // se traduce a su código de texto (CC/TI/CE/PA/PEP/NIT) porque es lo
+        // que consumen sistemas externos como CDR. Solo aplica a personas,
+        // nunca a empresas (que se identifican por NIT).
+        $tipoDocumento = null;
+        if (!$esEmpresa && !empty($entidad['tipo_identificacion_id'])) {
+            try {
+                $tipoDocumento = $this->core->tipoIdentificacion($entidad['tipo_identificacion_id'])['codigo'] ?? null;
+            } catch (\Throwable $e) {
+                Log::warning("No se pudo resolver tipo_identificacion_id {$entidad['tipo_identificacion_id']} del Core: {$e->getMessage()}");
+            }
+        }
+
         return [
             'id'              => $tercero->id,
             'codigo'          => $tercero->codigo,
@@ -376,8 +389,10 @@ class RadicadoService
             'nombre_completo' => $esEmpresa
                 ? ($entidad['razon_social'] ?? '')
                 : trim(($entidad['nombres'] ?? '').' '.($entidad['apellidos'] ?? '')),
-            'email'    => $entidad['email'] ?? null,
-            'telefono' => $entidad['telefono'] ?? null,
+            'email'          => $entidad['email'] ?? null,
+            'telefono'       => $entidad['telefono'] ?? null,
+            'direccion'      => $entidad['direccion'] ?? null,
+            'tipo_documento' => $tipoDocumento,
         ];
     }
 
