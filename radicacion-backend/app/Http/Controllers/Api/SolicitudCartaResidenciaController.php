@@ -64,17 +64,32 @@ class SolicitudCartaResidenciaController extends Controller
 
         [$nombres, $apellidos] = $this->partirNombre($data['nombre_completo']);
 
+        $datosCiudadano = [
+            'tipo_identificacion_id' => $tipoIdentificacion['id'],
+            'numero_identificacion'  => $data['numero_identificacion'],
+            'nombres'                => $nombres,
+            'apellidos'              => $apellidos,
+            'telefono'               => $data['celular'],
+            'email'                  => $data['correo'],
+            'direccion'              => $data['direccion'],
+        ];
+
         $ciudadano = $this->core->buscarCiudadanoPorIdentificacion($tipoIdentificacion['id'], $data['numero_identificacion']);
         if (!$ciudadano) {
-            $ciudadano = $this->core->crearCiudadano([
-                'tipo_identificacion_id' => $tipoIdentificacion['id'],
-                'numero_identificacion'  => $data['numero_identificacion'],
-                'nombres'                => $nombres,
-                'apellidos'              => $apellidos,
-                'telefono'               => $data['celular'],
-                'email'                  => $data['correo'],
-                'direccion'              => $data['direccion'],
-            ]);
+            $ciudadano = $this->core->crearCiudadano($datosCiudadano);
+        } elseif ($this->datosCiudadanoDifieren($ciudadano, $datosCiudadano)) {
+            // El ciudadano ya existía en el Core pero con datos distintos a
+            // los que acaba de escribir en el formulario de CDR (ej. cambió
+            // de correo o teléfono) — se actualiza para que el resto del
+            // sistema (empezando por el correo de confirmación de este mismo
+            // radicado) use el dato fresco. Best-effort: si el Core no
+            // soporta esta ruta, se sigue con el registro viejo sin romper
+            // la radicación.
+            try {
+                $ciudadano = $this->core->actualizarCiudadano($ciudadano['id'], $datosCiudadano);
+            } catch (\Throwable $e) {
+                Log::warning("No se pudo actualizar ciudadano {$ciudadano['id']} en el Core desde intake CDR: {$e->getMessage()}");
+            }
         }
 
         $tercero = Tercero::firstOrCreate(
@@ -154,5 +169,20 @@ class SolicitudCartaResidenciaController extends Controller
 
         $apellidos = array_pop($partes);
         return [implode(' ', $partes), $apellidos];
+    }
+
+    // Compara los campos de contacto/nombre entre lo que ya tiene el Core y
+    // lo que acaba de llegar en la solicitud — solo interesa detectar
+    // cambios en estos, no en identidad (tipo/numero_identificacion, que es
+    // la clave con la que se buscó y nunca cambia aquí).
+    private function datosCiudadanoDifieren(array $ciudadanoCore, array $datosNuevos): bool
+    {
+        foreach (['nombres', 'apellidos', 'telefono', 'email', 'direccion'] as $campo) {
+            if (trim((string) ($ciudadanoCore[$campo] ?? '')) !== trim((string) ($datosNuevos[$campo] ?? ''))) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

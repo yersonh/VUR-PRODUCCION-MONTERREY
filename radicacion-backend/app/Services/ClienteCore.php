@@ -219,6 +219,11 @@ class ClienteCore
         return $this->post('ciudadanos', $data);
     }
 
+    public function actualizarCiudadano(int $id, array $data): array
+    {
+        return $this->put("ciudadanos/{$id}", $data);
+    }
+
     // ── Empresas ───────────────────────────────────────────────────
     // Respuesta: paginada. Filtro soportado: nit.
 
