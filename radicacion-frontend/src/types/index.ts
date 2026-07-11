@@ -6,12 +6,16 @@ export interface User {
   role: Role
   dependencia_id?: number
   dependencia?: Dependencia
+  funcionario_id?: number | null
+  funcionario_nombre?: string | null
   activo: boolean
+  tiene_foto?: boolean
+  debe_cambiar_password?: boolean
 }
 
 export interface Role {
   id: number
-  nombre: 'ADMIN' | 'OPERADOR' | 'JEFE_DEPENDENCIA' | 'FUNCIONARIO'
+  nombre: 'ADMIN' | 'OPERADOR' | 'FUNCIONARIO'
   descripcion?: string
 }
 
@@ -61,11 +65,37 @@ export interface Tercero {
   activo: boolean
 }
 
+// Formas resueltas vía Core Institucional por RadicadoService::funcionarioInfo()
+// y terceroInfo() — no confundir con los tipos `Personal`/`Tercero` locales,
+// que reflejan la forma de los endpoints /admin/personal y /terceros.
+export interface FuncionarioResumen {
+  id: number
+  cedula: string
+  nombre_completo: string
+  cargo?: string | null
+  email?: string | null
+  dependencia_id?: number | null
+}
+
+export interface TerceroResumen {
+  id: number
+  codigo: string
+  categoria: 'EMPRESA' | 'CIUDADANO'
+  nro_identificacion: string
+  nombre_completo: string
+  email?: string | null
+  telefono?: string | null
+  direccion?: string | null
+  tipo_documento?: string | null
+}
+
 export interface TipoCorrespondencia {
   id: number
   descripcion: string
   max_dias: number
   activo: boolean
+  dependencia_destino_id: number | null
+  dependencia_destino_descripcion?: string | null
 }
 
 export interface AuxTip {
@@ -135,18 +165,15 @@ export interface Radicado {
   fecha_radicacion: string
   hora_radicacion: string
   tipo_remitente: 'FUNCIONARIO' | 'TERCERO_NIT'
-  funcionario?: Personal
-  tercero?: Tercero
+  funcionario?: FuncionarioResumen
+  tercero?: TerceroResumen
   dependencia_remitente?: Dependencia
   tipo_correspondencia: TipoCorrespondencia
   aux_tip?: AuxTip
   aux_descripcion?: string
   fecha_limite?: string
-  tipo_destino: 'INTERNO' | 'TERCERO_NIT' | 'CIUDADANO'
   dependencia_destino?: Dependencia
-  personal_destino?: Personal
-  tercero_destino?: Tercero
-  nombre_persona_destino?: string
+  personal_destino?: FuncionarioResumen
   folios?: number
   folios_de?: number
   cantidad_anexos?: number
@@ -167,6 +194,7 @@ export interface Radicado {
   operador: Pick<User, 'id' | 'name'>
   documentos?: RadicadoDocumento[]
   actuaciones?: RadicadoActuacion[]
+  puede_responder?: boolean
   created_at: string
 }
 
@@ -178,7 +206,7 @@ export interface AuthResponse {
 
 export type EstadoRadicado = 'RADICADO' | 'EN_TRAMITE' | 'RESPONDIDO' | 'CERRADO' | 'ANULADO'
 
-export type TipoNotificacion = 'RADICADO_NUEVO' | 'ESTADO_CAMBIADO' | 'VENCIMIENTO'
+export type TipoNotificacion = 'RADICADO_NUEVO' | 'ESTADO_CAMBIADO' | 'VENCIMIENTO' | 'RESPUESTA_CARGADA'
 
 export interface Notificacion {
   id: number
@@ -212,10 +240,8 @@ export interface IACamposSugeridos {
   tipo_remitente_sugerido?: 'FUNCIONARIO' | 'EMPRESA' | 'CIUDADANO' | null
   dependencia_remitente?: string | null
   cargo_remitente?: string | null
-  tipo_destinatario?: 'INTERNO' | 'EMPRESA' | 'CIUDADANO' | null
   nombre_destinatario?: string | null
   dependencia_destino?: string | null
-  nombre_empresa_destino?: string | null
   cargo_destinatario?: string | null
   es_solicitud_residencia?: boolean
 }

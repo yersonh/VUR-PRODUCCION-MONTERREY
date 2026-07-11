@@ -45,7 +45,7 @@ function Campo({ label, value, mono }: { label: string; value?: string | number 
       <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wide">{label}</span>
       <div className={cn(
         'px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm min-h-[36px]',
-        mono ? 'font-mono font-bold text-[#1B3A6E]' : 'text-slate-700',
+        mono ? 'font-mono font-bold text-[#0B1220]' : 'text-slate-700',
         !value && 'text-slate-300',
       )}>
         {value ?? '—'}
@@ -59,7 +59,7 @@ function Seccion({ titulo, children }: { titulo: string; children: React.ReactNo
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-3">
-        <span className="text-[11px] font-bold text-[#1B3A6E] uppercase tracking-widest whitespace-nowrap">{titulo}</span>
+        <span className="text-[11px] font-bold text-[#0B1220] uppercase tracking-widest whitespace-nowrap">{titulo}</span>
         <div className="flex-1 h-px bg-slate-200" />
       </div>
       {children}
@@ -77,7 +77,7 @@ function TimelineActuacion({ actuacion, isLast }: { actuacion: RadicadoActuacion
   return (
     <div className="flex gap-4">
       <div className="flex flex-col items-center">
-        <div className="w-8 h-8 rounded-full bg-[#1B3A6E] flex items-center justify-center shrink-0">
+        <div className="w-8 h-8 rounded-full bg-[#0B1220] flex items-center justify-center shrink-0">
           <CheckCircleIcon className="w-4 h-4 text-white" />
         </div>
         {!isLast && <div className="w-px flex-1 bg-slate-200 my-1" />}
@@ -127,9 +127,9 @@ function CambiarEstadoModal({ open, estadoActual, onCambiar, onClose, guardando 
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1, transition: { duration: 0.18 } }}
-        className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden"
+        className="relative w-full max-w-md bg-white/90 backdrop-blur-sm rounded-2xl shadow-2xl overflow-hidden"
       >
-        <div className="bg-[#1B3A6E] px-5 py-4">
+        <div className="bg-[#0B1220] px-5 py-4">
           <h3 className="text-white font-semibold text-sm">Cambiar Estado del Radicado</h3>
           <p className="text-blue-200 text-xs mt-0.5">Estado actual: <strong>{ESTADO_LABELS[estadoActual]}</strong></p>
         </div>
@@ -141,7 +141,7 @@ function CambiarEstadoModal({ open, estadoActual, onCambiar, onClose, guardando 
                 <label key={op} className={cn(
                   'flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all',
                   estadoSel === op
-                    ? 'border-[#2B5BA8] bg-blue-50'
+                    ? 'border-[#C8A800] bg-blue-50'
                     : 'border-slate-200 hover:border-slate-300',
                 )}>
                   <input
@@ -150,7 +150,7 @@ function CambiarEstadoModal({ open, estadoActual, onCambiar, onClose, guardando 
                     value={op}
                     checked={estadoSel === op}
                     onChange={() => setEstadoSel(op)}
-                    className="accent-[#2B5BA8]"
+                    className="accent-[#C8A800]"
                   />
                   <span className="flex-1">
                     <EstadoBadge estado={op} />
@@ -171,7 +171,7 @@ function CambiarEstadoModal({ open, estadoActual, onCambiar, onClose, guardando 
                 maxLength={300}
                 rows={3}
                 placeholder="Motivo del cambio de estado..."
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#2B5BA8] resize-none"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800] resize-none"
               />
               <span className={cn(
                 'absolute bottom-2 right-2.5 text-[10px]',
@@ -195,7 +195,7 @@ function CambiarEstadoModal({ open, estadoActual, onCambiar, onClose, guardando 
             type="button"
             onClick={() => estadoSel && onCambiar(estadoSel, observacion)}
             disabled={!estadoSel || guardando || (estadoSel === 'ANULADO' && !observacion.trim())}
-            className="flex-1 py-2.5 bg-[#1B3A6E] hover:bg-[#14306A] text-white rounded-xl text-sm font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex-1 py-2.5 bg-[#0B1220] hover:bg-[#060911] text-white rounded-xl text-sm font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {guardando ? 'Guardando...' : 'Confirmar cambio'}
           </button>
@@ -334,10 +334,10 @@ export default function RadicadoDetalle() {
   const nombreRemitente = () => {
     if (!radicado) return '—'
     if (radicado.tercero) {
-      return `${radicado.tercero.nombres} ${radicado.tercero.primer_apellido}`.trim()
+      return radicado.tercero.nombre_completo
     }
     if (radicado.funcionario) {
-      return `${radicado.funcionario.nombres} ${radicado.funcionario.apellidos}`.trim()
+      return radicado.funcionario.nombre_completo
     }
     return radicado.nombre_persona_empresa ?? '—'
   }
@@ -355,7 +355,7 @@ export default function RadicadoDetalle() {
       <AppLayout subtitle="Detalle de Radicado">
         <div className="flex-1 p-4 md:p-6 max-w-screen-xl mx-auto w-full space-y-4 animate-pulse">
           <div className="h-8 bg-slate-200 rounded-xl w-64" />
-          <div className="bg-white rounded-2xl p-5 space-y-4">
+          <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-5 space-y-4">
             {Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="grid grid-cols-4 gap-3">
                 {Array.from({ length: 4 }).map((__, j) => (
@@ -380,23 +380,23 @@ export default function RadicadoDetalle() {
           <div className="flex items-center gap-3">
             <Link
               to="/radicados"
-              className="p-2 rounded-xl border border-slate-300 text-slate-600 hover:bg-slate-50 transition-colors"
+              className="p-2 rounded-xl border border-white/20 text-slate-200 hover:bg-white/10 transition-colors"
             >
               <ArrowLeftIcon className="w-4 h-4" />
             </Link>
             <div>
               <div className="flex items-center gap-3">
-                <h1 className="text-xl font-bold text-[#1B3A6E] font-mono">
+                <h1 className="text-xl font-bold text-white font-mono">
                   {formatNumeroRadicado(radicado.nro_radicado, radicado.año_radicado)}
                 </h1>
                 {estadoActual && <EstadoBadge estado={estadoActual} />}
                 {radicado.ia_procesado && (
-                  <span className="flex items-center gap-1 text-xs text-indigo-600 font-medium">
+                  <span className="flex items-center gap-1 text-xs text-indigo-300 font-medium">
                     <SparklesIcon className="w-3.5 h-3.5" /> IA
                   </span>
                 )}
               </div>
-              <p className="text-sm text-slate-500 mt-0.5">
+              <p className="text-sm text-slate-300 mt-0.5">
                 {formatFecha(radicado.fecha_radicacion)} · {radicado.hora_radicacion} · Operador: {radicado.operador.name}
               </p>
             </div>
@@ -408,7 +408,7 @@ export default function RadicadoDetalle() {
               type="button"
               onClick={cargar}
               title="Recargar"
-              className="p-2 border border-slate-300 text-slate-600 rounded-xl hover:bg-slate-50 transition-colors"
+              className="p-2 border border-white/20 text-slate-200 rounded-xl hover:bg-white/10 transition-colors"
             >
               <ArrowPathIcon className="w-4 h-4" />
             </button>
@@ -417,7 +417,7 @@ export default function RadicadoDetalle() {
               <button
                 type="button"
                 onClick={() => setModalEstado(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-[#2B5BA8] hover:bg-[#1B3A6E] text-white rounded-xl text-sm font-medium transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-[#C8A800] hover:bg-[#0B1220] text-white rounded-xl text-sm font-medium transition-colors"
               >
                 <PencilSquareIcon className="w-4 h-4" /> Cambiar Estado
               </button>
@@ -441,7 +441,7 @@ export default function RadicadoDetalle() {
           <div className="xl:col-span-2 space-y-4">
 
             {/* Bloque encabezado */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
+            <div className="bg-white/90 backdrop-blur-sm rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
               <Seccion titulo="Datos de Radicación">
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                   <Campo label="Año" value={radicado.año_radicado} />
@@ -482,10 +482,7 @@ export default function RadicadoDetalle() {
                   <Campo label="Dependencia destino" value={radicado.dependencia_destino?.descripcion} />
                   <Campo
                     label="Responsable"
-                    value={radicado.personal_destino
-                      ? `${radicado.personal_destino.nombres} ${radicado.personal_destino.apellidos}`
-                      : undefined
-                    }
+                    value={radicado.personal_destino?.nombre_completo}
                   />
                 </div>
               </Seccion>
@@ -511,7 +508,7 @@ export default function RadicadoDetalle() {
                     <ul className="space-y-1.5">
                       {radicado.anexos.map((item, i) => (
                         <li key={i} className="flex items-start gap-2 text-sm">
-                          <span className="text-[#2B5BA8] font-semibold shrink-0 mt-0.5">{i + 1}.</span>
+                          <span className="text-[#C8A800] font-semibold shrink-0 mt-0.5">{i + 1}.</span>
                           <div className="flex-1 flex flex-col gap-0.5">
                             <span className="text-slate-700">{item.descripcion}</span>
                             {item.tipo_id && (
@@ -525,7 +522,7 @@ export default function RadicadoDetalle() {
                               href={`/api/v1/radicados/${radicado.id}/documentos/${item.documento_id}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="p-1 text-[#2B5BA8] hover:text-[#1B3A6E] transition-colors shrink-0"
+                              className="p-1 text-[#C8A800] hover:text-[#0B1220] transition-colors shrink-0"
                               title="Descargar anexo"
                             >
                               <DocumentArrowDownIcon className="w-4 h-4" />
@@ -565,12 +562,12 @@ export default function RadicadoDetalle() {
                         onChange={e => setNuevoAnexoDescripcion(e.target.value)}
                         placeholder="Descripción del anexo"
                         maxLength={150}
-                        className="sm:col-span-1 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#2B5BA8]"
+                        className="sm:col-span-1 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800]"
                       />
                       <select
                         value={nuevoAnexoTipoId ?? ''}
                         onChange={e => setNuevoAnexoTipoId(e.target.value ? Number(e.target.value) : null)}
-                        className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#2B5BA8]"
+                        className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800]"
                       >
                         <option value="">Tipo de anexo...</option>
                         {tiposAnexo.map(t => (
@@ -581,14 +578,14 @@ export default function RadicadoDetalle() {
                         type="file"
                         accept="application/pdf"
                         onChange={e => setNuevoAnexoArchivo(e.target.files?.[0] ?? null)}
-                        className="text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-blue-50 file:text-[#2B5BA8] hover:file:bg-blue-100"
+                        className="text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-blue-50 file:text-[#C8A800] hover:file:bg-blue-100"
                       />
                     </div>
                     <button
                       type="button"
                       onClick={handleAgregarAnexo}
                       disabled={!nuevoAnexoDescripcion.trim() || agregandoAnexo}
-                      className="px-4 py-1.5 bg-[#2B5BA8] hover:bg-[#1B3A6E] text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+                      className="px-4 py-1.5 bg-[#C8A800] hover:bg-[#0B1220] text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
                     >
                       {agregandoAnexo ? 'Agregando...' : '+ Agregar anexo'}
                     </button>
@@ -606,7 +603,7 @@ export default function RadicadoDetalle() {
             </div>
 
             {/* PDFs adjuntos */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
+            <div className="bg-white/90 backdrop-blur-sm rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
               <Seccion titulo="Documentos PDF">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   {/* PDF Entrada */}
@@ -666,7 +663,7 @@ export default function RadicadoDetalle() {
                           <DocumentArrowDownIcon className="w-4 h-4" />
                         </a>
                       </div>
-                    ) : estadoActual && !['CERRADO', 'ANULADO'].includes(estadoActual) ? (
+                    ) : estadoActual && !['CERRADO', 'ANULADO'].includes(estadoActual) && radicado.puede_responder ? (
                       <div className="space-y-2">
                         <PDFUploader
                           label=""
@@ -685,6 +682,10 @@ export default function RadicadoDetalle() {
                           </button>
                         )}
                       </div>
+                    ) : estadoActual && !['CERRADO', 'ANULADO'].includes(estadoActual) ? (
+                      <div className="flex items-center gap-2 p-3 bg-amber-50 border border-dashed border-amber-200 rounded-xl text-amber-600 text-xs">
+                        Solo el funcionario responsable de este radicado puede adjuntar la respuesta.
+                      </div>
                     ) : (
                       <div className="flex items-center gap-2 p-3 bg-slate-50 border border-dashed border-slate-300 rounded-xl text-slate-400 text-sm">
                         Sin PDF de respuesta
@@ -700,7 +701,7 @@ export default function RadicadoDetalle() {
           <div className="space-y-4">
 
             {/* Resumen rápido */}
-            <div className="bg-[#1B3A6E] rounded-2xl p-5 text-white space-y-3">
+            <div className="bg-[#0B1220] rounded-2xl p-5 text-white space-y-3">
               <p className="text-xs text-blue-200 uppercase tracking-widest font-semibold">Resumen</p>
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
@@ -741,10 +742,10 @@ export default function RadicadoDetalle() {
             </div>
 
             {/* Timeline de actuaciones */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+            <div className="bg-white/90 backdrop-blur-sm rounded-2xl border border-slate-200 shadow-sm p-5">
               <div className="flex items-center gap-2 mb-4">
-                <ClockIcon className="w-4 h-4 text-[#1B3A6E]" />
-                <span className="text-sm font-bold text-[#1B3A6E] uppercase tracking-wide">Historial</span>
+                <ClockIcon className="w-4 h-4 text-[#0B1220]" />
+                <span className="text-sm font-bold text-[#0B1220] uppercase tracking-wide">Historial</span>
               </div>
 
               {(radicado.actuaciones ?? []).length === 0 ? (
