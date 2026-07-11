@@ -20,8 +20,8 @@ class Radicado extends Model
         'dependencia_destino_id', 'personal_destino_id',
         'tipo_destino', 'tercero_destino_id', 'nombre_persona_destino',
         'folios', 'folios_de', 'cantidad_anexos', 'tipo_anexo_id', 'otro_anexo', 'anexos',
-        'nro_factura', 'valor_factura', 'fecha_documento', 'fecha_entrega',
-        'medio_ingreso_id', 'nro_guia', 'observaciones',
+        'fecha_documento', 'fecha_entrega',
+        'medio_ingreso_id', 'observaciones',
         'ia_procesado', 'ia_campos_sugeridos',
         'estado_id', 'operador_id',
     ];
@@ -34,7 +34,6 @@ class Radicado extends Model
         'ia_procesado'        => 'boolean',
         'ia_campos_sugeridos' => 'array',
         'anexos'              => 'array',
-        'valor_factura'       => 'decimal:2',
     ];
 
     // ── Relaciones ──────────────────────────────────────────────────

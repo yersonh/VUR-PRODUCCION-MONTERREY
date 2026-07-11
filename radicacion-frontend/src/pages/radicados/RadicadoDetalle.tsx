@@ -492,9 +492,6 @@ export default function RadicadoDetalle() {
                   <Campo label="Folios" value={radicado.folios ?? '—'} />
                   <Campo label="De" value={radicado.folios_de ?? '—'} />
                   <Campo label="Medio Ingreso" value={radicado.medio_ingreso?.descripcion} />
-                  <Campo label="Nro. Guía" value={radicado.nro_guia} />
-                  <Campo label="Nro. Factura" value={radicado.nro_factura} />
-                  <Campo label="Valor Factura" value={radicado.valor_factura != null ? `$${Number(radicado.valor_factura).toLocaleString('es-CO')}` : undefined} />
                   <Campo label="Fecha Documento" value={formatFecha(radicado.fecha_documento)} />
                   <Campo label="Fecha Entrega" value={formatFecha(radicado.fecha_entrega)} />
                 </div>

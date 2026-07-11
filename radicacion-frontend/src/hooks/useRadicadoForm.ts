@@ -16,33 +16,26 @@ const radicadoSchemaBase = z.object({
   tipo_correspondencia_id: z.number().min(1, 'Seleccione un tipo'),
   aux_tip_id:              z.number().nullable(),
   aux_descripcion:         z.string().max(100).nullable(),
-  tipo_destino:            z.enum(['INTERNO', 'TERCERO_NIT', 'CIUDADANO']),
+  // El destino siempre es una dependencia interna: se autocompleta desde el
+  // tipo de correspondencia elegido, o desde lo que detecte la IA en el PDF.
   dependencia_destino_id:  z.number().nullable(),
   personal_destino_id:     z.number().nullable(),
-  tercero_destino_id:      z.number().nullable(),
-  nombre_persona_destino:  z.string().max(100).nullable(),
   folios:                  z.number().nullable(),
   folios_de:               z.number().nullable(),
   cantidad_anexos:         z.number().nullable(),
   tipo_anexo_id:           z.number().nullable(),
   otro_anexo:              z.string().max(60).nullable(),
   anexos:                  z.array(z.object({ descripcion: z.string().max(150), tipo_id: z.number().nullable() })).nullable(),
-  nro_factura:             z.string().max(30).nullable(),
-  valor_factura:           z.string().nullable(),
   fecha_documento:         z.string().nullable(),
   fecha_entrega:           z.string().nullable(),
   medio_ingreso_id:        z.number().min(1, 'Seleccione un medio'),
-  nro_guia:                z.string().max(30).nullable(),
   nombre_persona_empresa:  z.string().max(100).nullable(),
   observaciones:           z.string().max(5700).nullable(),
 })
 
 export const radicadoSchema = radicadoSchemaBase.superRefine((data, ctx) => {
-  if (data.tipo_destino === 'INTERNO' && !data.dependencia_destino_id) {
+  if (!data.dependencia_destino_id) {
     ctx.addIssue({ code: 'custom', path: ['dependencia_destino_id'], message: 'Seleccione una dependencia' })
-  }
-  if (data.tipo_destino !== 'INTERNO' && !data.tercero_destino_id) {
-    ctx.addIssue({ code: 'custom', path: ['tercero_destino_id'], message: 'Seleccione el destinatario externo' })
   }
 })
 
@@ -58,7 +51,6 @@ export interface DisplayState {
   descripcionAuxTip: string
   descripcionDepDestino: string
   responsable: string
-  descripcionTerceroDestino: string
   descripcionTipoAnexo: string
   descripcionMedioIngreso: string
 }
@@ -72,7 +64,6 @@ const DISPLAY_INIT: DisplayState = {
   descripcionAuxTip:       '',
   descripcionDepDestino:   '',
   responsable:             '',
-  descripcionTerceroDestino: '',
   descripcionTipoAnexo:    '',
   descripcionMedioIngreso: '',
 }
@@ -87,23 +78,17 @@ const DEFAULT_VALUES: RadicadoFormValues = {
   tipo_correspondencia_id: 0,
   aux_tip_id:              null,
   aux_descripcion:         null,
-  tipo_destino:            'INTERNO',
   dependencia_destino_id:  null,
   personal_destino_id:     null,
-  tercero_destino_id:      null,
-  nombre_persona_destino:  null,
   folios:                  null,
   folios_de:               null,
   cantidad_anexos:         null,
   tipo_anexo_id:           null,
   otro_anexo:              null,
   anexos:                  null,
-  nro_factura:             null,
-  valor_factura:           null,
   fecha_documento:         null,
   fecha_entrega:           null,
   medio_ingreso_id:        0,
-  nro_guia:                null,
   nombre_persona_empresa:  null,
   observaciones:           null,
 }
@@ -163,9 +148,7 @@ export function useRadicadoForm() {
   const limpiarDestino = () => {
     form.setValue('dependencia_destino_id', null)
     form.setValue('personal_destino_id', null)
-    form.setValue('tercero_destino_id', null)
-    form.setValue('nombre_persona_destino', null)
-    setDisplayField({ descripcionDepDestino: '', responsable: '', descripcionTerceroDestino: '' })
+    setDisplayField({ descripcionDepDestino: '', responsable: '' })
   }
 
   const resetForm = () => {

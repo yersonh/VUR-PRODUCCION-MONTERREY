@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Radicado;
-use App\Services\BrevoMailService;
+use App\Models\User;
 use App\Services\ClienteCore;
 use App\Services\RadicadoService;
 use Illuminate\Http\JsonResponse;
@@ -16,7 +16,6 @@ class RadicadoController extends Controller
 {
     public function __construct(
         private RadicadoService  $service,
-        private BrevoMailService $brevo,
         private ClienteCore      $core,
     ) {}
 
@@ -76,6 +75,26 @@ class RadicadoController extends Controller
         ->when($request->filled('dependencia_destino_id'), fn ($q) =>
             $q->where('dependencia_destino_id', $request->integer('dependencia_destino_id'))
         )
+        // 'asignados_a_mi': usado por la vista "Mis Radicados" del rol
+        // FUNCIONARIO — mismo criterio que RadicadoService::puedeResponder().
+        ->when($request->boolean('asignados_a_mi'), function ($q) use ($request) {
+            /** @var User $user */
+            $user = $request->user();
+            $q->where(function ($q2) use ($user) {
+                if ($user->funcionario_id) {
+                    $q2->where('personal_destino_id', $user->funcionario_id);
+                }
+                if ($user->dependencia_id) {
+                    $q2->orWhere(function ($q3) use ($user) {
+                        $q3->whereNull('personal_destino_id')
+                           ->where('dependencia_destino_id', $user->dependencia_id);
+                    });
+                }
+                if (!$user->funcionario_id && !$user->dependencia_id) {
+                    $q2->whereRaw('1 = 0');
+                }
+            });
+        })
         ->orderBy('nro_radicado', 'desc');
 
         $paginated = $query->paginate($perPage);
@@ -126,26 +145,14 @@ class RadicadoController extends Controller
     {
         $data = $request->validate($this->reglasValidacion());
 
+        // Las notificaciones (email al remitente, aviso al responsable, etc.)
+        // se disparan dentro de RadicadoService::crear() — no duplicar aquí.
         $radicado = $this->service->crear(
             datos: $data,
             operadorId: $request->user()->id,
             pdfEntrada: $request->file('pdf_entrada'),
             pdfSalida:  $request->file('pdf_salida'),
         );
-
-        // Notificar remitente si tiene email
-        $emailRemitente = $this->service->emailRemitente($radicado);
-        if ($emailRemitente) {
-            $this->brevo->enviarConfirmacionRadicado(
-                destinatarioEmail:     $emailRemitente,
-                destinatarioNombre:    $this->service->nombreRemitente($radicado),
-                numeroRadicado:        $radicado->numero_radicado,
-                fechaRadicacion:       $radicado->fecha_radicacion->format('d/m/Y'),
-                tipoCorrespondencia:   $radicado->tipoCorrespondencia?->descripcion ?? '',
-                dependenciaDestino:    $this->service->dependenciaInfo($radicado->dependencia_destino_id)['descripcion'] ?? '',
-                fechaLimite:           $radicado->fecha_limite?->format('d/m/Y'),
-            );
-        }
 
         return response()->json([
             'data'            => $this->formatDetalle($radicado),
@@ -160,6 +167,15 @@ class RadicadoController extends Controller
         $radicado = Radicado::findOrFail($id);
 
         if ($request->hasFile('pdf_salida')) {
+            /** @var User $user */
+            $user = $request->user();
+
+            if (! $this->service->puedeResponder($radicado, $user)) {
+                return response()->json([
+                    'message' => 'Solo el funcionario responsable de este radicado puede adjuntar la respuesta.',
+                ], 403);
+            }
+
             $request->validate([
                 'pdf_salida' => ['file', 'mimes:pdf', 'max:20480'],
             ]);
@@ -167,7 +183,7 @@ class RadicadoController extends Controller
             $radicado = $this->service->adjuntarPdfSalida(
                 $radicado,
                 $request->file('pdf_salida'),
-                $request->user()->id,
+                $user->id,
             );
         }
 
@@ -315,11 +331,11 @@ class RadicadoController extends Controller
             'tipo_correspondencia_id' => ['required', 'integer', 'exists:tipos_correspondencia,id'],
             'aux_tip_id'              => ['nullable', 'integer', 'exists:aux_tips,id'],
             'aux_descripcion'         => ['nullable', 'string', 'max:100'],
-            'tipo_destino'            => ['required', 'in:INTERNO,TERCERO_NIT,CIUDADANO'],
-            'dependencia_destino_id'  => ['required_if:tipo_destino,INTERNO', 'nullable', 'integer', Rule::in($this->idsDependenciasCore())],
+            // El destino siempre es una dependencia interna (tipo_destino/
+            // tercero_destino_id/nombre_persona_destino quedaron obsoletos y
+            // solo se conservan como columnas históricas en BD, sin uso aquí).
+            'dependencia_destino_id'  => ['required', 'integer', Rule::in($this->idsDependenciasCore())],
             'personal_destino_id'     => ['nullable', 'integer'],
-            'tercero_destino_id'      => ['required_if:tipo_destino,TERCERO_NIT,CIUDADANO', 'nullable', 'integer', 'exists:terceros,id'],
-            'nombre_persona_destino'  => ['nullable', 'string', 'max:100'],
             'folios'                  => ['nullable', 'integer', 'min:1'],
             'folios_de'               => ['nullable', 'integer', 'min:1'],
             'cantidad_anexos'         => ['nullable', 'integer', 'min:0'],
@@ -329,12 +345,9 @@ class RadicadoController extends Controller
             'anexos.*.descripcion'    => ['required_with:anexos', 'string', 'max:150'],
             'anexos.*.tipo_id'        => ['nullable', 'integer', 'exists:tipos_anexo,id'],
             'anexos.*.archivo'        => ['nullable', 'file', 'mimes:pdf', 'max:20480'],
-            'nro_factura'             => ['nullable', 'string', 'max:30'],
-            'valor_factura'           => ['nullable', 'numeric', 'min:0'],
             'fecha_documento'         => ['nullable', 'date'],
             'fecha_entrega'           => ['nullable', 'date'],
             'medio_ingreso_id'        => ['nullable', 'integer', 'exists:medios_ingreso,id'],
-            'nro_guia'                => ['nullable', 'string', 'max:30'],
             'observaciones'           => ['nullable', 'string', 'max:5700'],
             'pdf_entrada'             => ['nullable', 'file', 'mimes:pdf', 'max:20480'],
             'pdf_salida'              => ['nullable', 'file', 'mimes:pdf', 'max:20480'],
@@ -377,18 +390,16 @@ class RadicadoController extends Controller
             'tipo_anexo'           => $r->tipoAnexo,
             'otro_anexo'           => $r->otro_anexo,
             'anexos'               => $r->anexos ?? [],
-            'nro_factura'          => $r->nro_factura,
-            'valor_factura'        => $r->valor_factura,
             'fecha_documento'      => $r->fecha_documento?->toDateString(),
             'fecha_entrega'        => $r->fecha_entrega?->toDateString(),
             'medio_ingreso'        => $r->medioIngreso,
-            'nro_guia'             => $r->nro_guia,
             'observaciones'        => $r->observaciones,
             'ia_procesado'         => $r->ia_procesado,
             'ia_campos_sugeridos'  => $r->ia_campos_sugeridos,
             'estado'               => $r->estado,
             'operador'             => $r->operador ? ['id' => $r->operador->id, 'name' => $r->operador->name] : null,
             'documentos'           => $r->documentos,
+            'puede_responder'      => $this->service->puedeResponder($r, request()->user()),
             'actuaciones'          => $r->actuaciones->map(fn ($a) => [
                 'id'              => $a->id,
                 'descripcion'     => $a->descripcion,

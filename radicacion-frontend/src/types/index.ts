@@ -180,12 +180,9 @@ export interface Radicado {
   tipo_anexo?: TipoAnexo
   otro_anexo?: string
   anexos?: AnexoItem[]
-  nro_factura?: string
-  valor_factura?: number
   fecha_documento?: string
   fecha_entrega?: string
   medio_ingreso?: MedioIngreso
-  nro_guia?: string
   nombre_persona_empresa?: string
   observaciones?: string
   ia_procesado: boolean

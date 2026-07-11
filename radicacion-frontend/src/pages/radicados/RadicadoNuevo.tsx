@@ -26,7 +26,7 @@ import { cn } from '@/lib/utils'
 type ModalKey =
   | 'tercero' | 'funcionario'
   | 'tipoCorr' | 'auxTip'
-  | 'depDestino' | 'personalDestino' | 'terceroDestino'
+  | 'depDestino' | 'personalDestino'
   | 'depRemitente'
   | null
 
@@ -43,7 +43,7 @@ interface TerceroRow {
 function SeccionTitulo({ titulo }: { titulo: string }) {
   return (
     <div className="flex items-center gap-3 py-1">
-      <span className="text-[11px] font-bold text-[#1B3A6E] uppercase tracking-widest whitespace-nowrap">
+      <span className="text-[11px] font-bold text-[#0B1220] uppercase tracking-widest whitespace-nowrap">
         {titulo}
       </span>
       <div className="flex-1 h-px bg-slate-200" />
@@ -124,11 +124,11 @@ export default function RadicadoNuevo() {
   const [terceroNoRegistrado, setTerceroNoRegistrado] = useState<IACamposSugeridos | null>(null)
   const [funcionarioNoRegistrado, setFuncionarioNoRegistrado] = useState<IACamposSugeridos | null>(null)
 
-  // Modal crear tercero — contexto 'remitente' | 'destino'
-  const [creandoTerceroCtx, setCreandoTerceroCtx] = useState<'remitente' | 'destino' | null>(null)
+  // Modal crear tercero — solo aplica al remitente (el destino siempre es una dependencia)
+  const [creandoTerceroCtx, setCreandoTerceroCtx] = useState<'remitente' | null>(null)
   const [terceroDefaults, setTerceroDefaults] = useState<TerceroDefaults | undefined>()
 
-  // Modal crear funcionario — contexto 'remitente' | 'destino'
+  // Modal crear funcionario — contexto 'remitente' | 'destino' (destino = responsable)
   const [creandoFuncionarioCtx, setCreandoFuncionarioCtx] = useState<'remitente' | 'destino' | null>(null)
   const [funcionarioDefaults, setFuncionarioDefaults] = useState<FuncionarioDefaults | undefined>()
   const [funcionarioRows, setFuncionarioRows] = useState<SearchRow[]>([])
@@ -139,15 +139,13 @@ export default function RadicadoNuevo() {
   const [contactosEmpresa, setContactosEmpresa] = useState<TerceroContacto[]>([])
   const [loadingContactos, setLoadingContactos] = useState(false)
 
-  // ── Contactos de empresa destino ──────────────────────────────────
-  const [contactosEmpresaDestino, setContactosEmpresaDestino] = useState<TerceroContacto[]>([])
-  const [loadingContactosDestino, setLoadingContactosDestino] = useState(false)
-
-  // ── Destino (interno o externo) ───────────────────────────────────
+  // ── Destino (siempre una dependencia interna) ─────────────────────
+  // La dependencia se autocompleta y bloquea según el tipo de correspondencia
+  // elegido, salvo que la IA ya haya detectado un destino en el PDF — en ese
+  // caso queda editable y las selecciones posteriores de tipo de
+  // correspondencia ya no la sobrescriben.
+  const [destinoDesbloqueadoPorIA, setDestinoDesbloqueadoPorIA] = useState(false)
   const [destinoNoRegistrado, setDestinoNoRegistrado] = useState<IACamposSugeridos | null>(null)
-  const [terceroDestinoRows, setTerceroDestinoRows] = useState<SearchRow[]>([])
-  const [terceroDestinoLoading, setTerceroDestinoLoading] = useState(false)
-  const debounceRefTerDestino = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [personalDestinoRows, setPersonalDestinoRows] = useState<SearchRow[]>([])
   const [personalDestinoLoading, setPersonalDestinoLoading] = useState(false)
   const debounceRefPerDestino = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -251,9 +249,12 @@ export default function RadicadoNuevo() {
   }
 
   const watchTipoRemitente = watch('tipo_remitente')
-  const watchTipoDestino = watch('tipo_destino')
-  const watchMedioIngresoId = watch('medio_ingreso_id')
   const watchTipoCorrespondenciaId = watch('tipo_correspondencia_id')
+
+  // Dependencia destino editable: si la IA ya la detectó, o si el tipo de
+  // correspondencia elegido no tiene una dependencia por defecto configurada.
+  const tipoCorrSeleccionado = tiposCorrespondencia.find(t => t.id === watchTipoCorrespondenciaId)
+  const destinoEditable = destinoDesbloqueadoPorIA || (watchTipoCorrespondenciaId > 0 && !tipoCorrSeleccionado?.dependencia_destino_id)
 
   // ── Cargar contactos de una empresa ──────────────────────────────
   const cargarContactosEmpresa = useCallback(async (terceroId: number) => {
@@ -267,20 +268,6 @@ export default function RadicadoNuevo() {
       if (res.ok) setContactosEmpresa(await res.json())
     } catch { /* silencioso */ } finally {
       setLoadingContactos(false)
-    }
-  }, [])
-
-  const cargarContactosEmpresaDestino = useCallback(async (terceroId: number) => {
-    setContactosEmpresaDestino([])
-    setLoadingContactosDestino(true)
-    try {
-      const res = await fetch(
-        `${import.meta.env.VITE_API_URL ?? '/api/v1'}/terceros/${terceroId}/contactos`,
-        { headers: { Authorization: `Bearer ${useAuthStore.getState().token ?? ''}` } },
-      )
-      if (res.ok) setContactosEmpresaDestino(await res.json())
-    } catch { /* silencioso */ } finally {
-      setLoadingContactosDestino(false)
     }
   }, [])
 
@@ -362,6 +349,21 @@ export default function RadicadoNuevo() {
     // Limpiar AuxTip al cambiar tipo de correspondencia (el filtrado cambia)
     limpiarAuxTip()
     setSelectedAuxTip(null)
+
+    // Autocompletar dependencia destino desde el tipo elegido — salvo que la
+    // IA ya haya fijado un destino a partir del PDF, en cuyo caso se respeta.
+    if (!destinoDesbloqueadoPorIA) {
+      const tc = useCatalogoStore.getState().tiposCorrespondencia.find(t => t.id === Number(row.id))
+      setValue('personal_destino_id', null)
+      setDisplayField({ responsable: '' })
+      if (tc?.dependencia_destino_id) {
+        setValue('dependencia_destino_id', tc.dependencia_destino_id)
+        setDisplayField({ descripcionDepDestino: tc.dependencia_destino_descripcion ?? '' })
+      } else {
+        setValue('dependencia_destino_id', null)
+        setDisplayField({ descripcionDepDestino: '' })
+      }
+    }
   }
 
   const selectAuxTip = (row: SearchRow) => {
@@ -386,25 +388,6 @@ export default function RadicadoNuevo() {
     setDisplayField({ descripcionDepRemitente: String(row.descripcion ?? '') })
   }
 
-  const selectTerceroDestino = (row: SearchRow) => {
-    const id = Number(row.id)
-    setValue('tercero_destino_id', id)
-    setValue('nombre_persona_destino', '')
-    setDisplayField({ descripcionTerceroDestino: String(row.razon_social ?? row.nombre_completo ?? '') })
-    setDestinoNoRegistrado(null)
-    if (watch('tipo_destino') === 'TERCERO_NIT') cargarContactosEmpresaDestino(id)
-    else setContactosEmpresaDestino([])
-  }
-
-  const handleTerceroDestinoCreado = (t: TerceroCreado, nombreContacto?: string) => {
-    setValue('tercero_destino_id', t.id)
-    setValue('nombre_persona_destino', nombreContacto ?? '')
-    setDisplayField({ descripcionTerceroDestino: t.razon_social })
-    setTerceroDestinoRows([{ id: t.id, nit: t.nit, razon_social: t.razon_social, municipio: t.municipio ?? '' }])
-    setDestinoNoRegistrado(null)
-    if (watch('tipo_destino') === 'TERCERO_NIT') cargarContactosEmpresaDestino(t.id)
-  }
-
   const handleFuncionarioDestinoCreado = (f: FuncionarioCreado) => {
     setValue('personal_destino_id', f.id)
     setDisplayField({ responsable: f.nombre_completo })
@@ -416,35 +399,6 @@ export default function RadicadoNuevo() {
       setDisplayField({ descripcionDepDestino: dep.descripcion })
     }
   }
-
-  // ── Búsqueda destino externo (server-side) ───────────────────────
-  const buscarTercerosDestino = useCallback((q: string) => {
-    if (debounceRefTerDestino.current) clearTimeout(debounceRefTerDestino.current)
-    debounceRefTerDestino.current = setTimeout(async () => {
-      setTerceroDestinoLoading(true)
-      try {
-        const tipo = watch('tipo_destino')
-        const categoria = tipo === 'TERCERO_NIT' ? 'NIT' : tipo === 'CIUDADANO' ? 'PERSONA' : ''
-        const qs = new URLSearchParams()
-        if (q.trim()) qs.set('q', q)
-        if (categoria) qs.set('categoria', categoria)
-        const params = qs.toString() ? `?${qs.toString()}` : ''
-        const res = await fetch(
-          `${import.meta.env.VITE_API_URL ?? '/api/v1'}/terceros${params}`,
-          { headers: { Authorization: `Bearer ${useAuthStore.getState().token ?? ''}` } },
-        )
-        if (!res.ok) throw new Error()
-        const data: TerceroRow[] = await res.json()
-        setTerceroDestinoRows(data.map(t => ({
-          id: t.id, nit: t.nit, razon_social: t.razon_social, municipio: t.municipio ?? '',
-        })))
-      } catch {
-        setTerceroDestinoRows([])
-      } finally {
-        setTerceroDestinoLoading(false)
-      }
-    }, 350)
-  }, [watch])
 
   // ── Búsqueda personal destino (server-side, arregla bug data=[]) ─
   const buscarPersonalDestino = useCallback((q: string) => {
@@ -542,66 +496,50 @@ export default function RadicadoNuevo() {
     }
   }, [])
 
-  // ── Búsqueda de destinatario post-IA ─────────────────────────────
+  // ── Búsqueda de destinatario post-IA (siempre una dependencia interna) ──
   const buscarDestinoIA = useCallback(async (campos: IACamposSugeridos) => {
     const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
     const API = import.meta.env.VITE_API_URL ?? '/api/v1'
     const headers = { Authorization: `Bearer ${useAuthStore.getState().token ?? ''}` }
 
-    if (campos.tipo_destinatario === 'INTERNO') {
-      setValue('tipo_destino', 'INTERNO')
-      const depNombre = norm(campos.dependencia_destino ?? '')
-      let dep = depNombre
-        ? useCatalogoStore.getState().dependencias.find(d => {
-            const n = norm(d.descripcion)
-            return n.includes(depNombre) || depNombre.includes(n)
-          })
-        : undefined
-      // Respaldo: si es una solicitud de carta de residencia y no hay una
-      // dependencia específica (el prompt ya le pide a Gemini usar "Despacho
-      // del Alcalde" en ese caso, pero por si no lo sigue al pie de la letra
-      // — solo el Alcalde despacha esas solicitudes, y no aplica para otros
-      // tipos de documento).
-      if (!dep && campos.es_solicitud_residencia) {
-        dep = useCatalogoStore.getState().dependencias.find(d => norm(d.descripcion).includes('despacho del alcalde'))
-      }
-      if (!dep) { setDestinoNoRegistrado(campos); return }
-      setValue('dependencia_destino_id', dep.id)
-      setDisplayField({ descripcionDepDestino: dep.descripcion })
+    const depNombre = norm(campos.dependencia_destino ?? '')
+    let dep = depNombre
+      ? useCatalogoStore.getState().dependencias.find(d => {
+          const n = norm(d.descripcion)
+          return n.includes(depNombre) || depNombre.includes(n)
+        })
+      : undefined
+    // Respaldo: si es una solicitud de carta de residencia y no hay una
+    // dependencia específica (el prompt ya le pide a Gemini usar "Despacho
+    // del Alcalde" en ese caso, pero por si no lo sigue al pie de la letra
+    // — solo el Alcalde despacha esas solicitudes, y no aplica para otros
+    // tipos de documento).
+    if (!dep && campos.es_solicitud_residencia) {
+      dep = useCatalogoStore.getState().dependencias.find(d => norm(d.descripcion).includes('despacho del alcalde'))
+    }
+    if (!dep) { setDestinoNoRegistrado(campos); return }
 
-      const nombre = (campos.nombre_destinatario ?? '').trim()
-      if (nombre.length >= 3) {
-        try {
-          const res = await fetch(`${API}/personal?q=${encodeURIComponent(nombre)}&dependencia_id=${dep.id}`, { headers })
-          const data: Array<{ id: number; cedula: string; nombre_completo: string; cargo: string | null }> = res.ok ? await res.json() : []
-          if (data.length === 1) {
-            setValue('personal_destino_id', data[0].id)
-            setDisplayField({ responsable: data[0].nombre_completo })
-            setPersonalDestinoRows([{ id: data[0].id, cedula: data[0].cedula, nombre_completo: data[0].nombre_completo, cargo: data[0].cargo ?? '' }])
-            return
-          }
-        } catch { /* continúa a banner */ }
-      }
-      setDestinoNoRegistrado(campos)
-    } else if (campos.tipo_destinatario === 'EMPRESA' || campos.tipo_destinatario === 'CIUDADANO') {
-      setValue('tipo_destino', campos.tipo_destinatario === 'EMPRESA' ? 'TERCERO_NIT' : 'CIUDADANO')
-      const nombre = (campos.nombre_empresa_destino || campos.nombre_destinatario || '').trim()
-      if (nombre.length < 3) { setDestinoNoRegistrado(campos); return }
+    // La IA identificó un destino explícito: desbloquea el campo de forma
+    // permanente para esta radicación (elegir otro tipo de correspondencia
+    // después ya no lo sobrescribe).
+    setDestinoDesbloqueadoPorIA(true)
+    setValue('dependencia_destino_id', dep.id)
+    setDisplayField({ descripcionDepDestino: dep.descripcion })
+
+    const nombre = (campos.nombre_destinatario ?? '').trim()
+    if (nombre.length >= 3) {
       try {
-        const res = await fetch(`${API}/terceros?q=${encodeURIComponent(nombre)}`, { headers })
-        const data: TerceroRow[] = res.ok ? await res.json() : []
+        const res = await fetch(`${API}/personal?q=${encodeURIComponent(nombre)}&dependencia_id=${dep.id}`, { headers })
+        const data: Array<{ id: number; cedula: string; nombre_completo: string; cargo: string | null }> = res.ok ? await res.json() : []
         if (data.length === 1) {
-          setValue('tercero_destino_id', data[0].id)
-          setDisplayField({ descripcionTerceroDestino: data[0].razon_social })
-          setTerceroDestinoRows([{ id: data[0].id, nit: data[0].nit, razon_social: data[0].razon_social, municipio: data[0].municipio ?? '' }])
-          if (campos.tipo_destinatario === 'EMPRESA' && campos.nombre_destinatario) {
-            setValue('nombre_persona_destino', campos.nombre_destinatario)
-          }
+          setValue('personal_destino_id', data[0].id)
+          setDisplayField({ responsable: data[0].nombre_completo })
+          setPersonalDestinoRows([{ id: data[0].id, cedula: data[0].cedula, nombre_completo: data[0].nombre_completo, cargo: data[0].cargo ?? '' }])
           return
         }
       } catch { /* continúa a banner */ }
-      setDestinoNoRegistrado(campos)
     }
+    setDestinoNoRegistrado(campos)
   }, [])
 
   // ── Análisis IA (Gemini) ──────────────────────────────────────────
@@ -704,8 +642,8 @@ export default function RadicadoNuevo() {
         }
       }
 
-      // Buscar destinatario en BD
-      if (campos.tipo_destinatario) {
+      // Buscar destinatario (dependencia) en BD
+      if (campos.dependencia_destino || campos.es_solicitud_residencia) {
         await buscarDestinoIA(campos)
       }
     } catch (err) {
@@ -760,6 +698,7 @@ export default function RadicadoNuevo() {
       setAnexosItems([])
       setIaCamposAplicados([])
       setIaRevisado(false)
+      setDestinoDesbloqueadoPorIA(false)
       navigate('/radicados')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error al guardar el radicado')
@@ -797,9 +736,6 @@ export default function RadicadoNuevo() {
     : auxTips
   const auxTipRows: SearchRow[] = auxTipsFiltrados.map(a => ({ id: a.id, descripcion: a.descripcion }))
 
-  const medioActual = mediosIngreso.find(m => m.id === watchMedioIngresoId)
-  const requiereGuia = medioActual?.descripcion?.toLowerCase().includes('mensajer') || medioActual?.descripcion?.toLowerCase().includes('transportador')
-
   return (
     <AppLayout subtitle="Nueva Radicación">
       <div className="flex-1 p-4 md:p-6 space-y-4 max-w-screen-xl mx-auto w-full">
@@ -807,13 +743,13 @@ export default function RadicadoNuevo() {
         {/* ── Encabezado de página ───────────────────────────────── */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold text-[#1B3A6E]">Nueva Radicación</h1>
-            <p className="text-sm text-slate-500">Ingreso de correspondencia · Año {añoRadicado}</p>
+            <h1 className="text-xl font-bold text-white">Nueva Radicación</h1>
+            <p className="text-sm text-slate-300">Ingreso de correspondencia · Año {añoRadicado}</p>
           </div>
           <button
             type="button"
             onClick={() => setConfirmCancelar(true)}
-            className="flex items-center gap-2 px-4 py-2 border border-slate-300 text-slate-600 rounded-xl text-sm hover:bg-slate-50 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 border border-white/20 text-slate-200 rounded-xl text-sm hover:bg-white/10 transition-colors"
           >
             <XMarkIcon className="w-4 h-4" /> Cancelar
           </button>
@@ -821,7 +757,7 @@ export default function RadicadoNuevo() {
 
         {/* ── Formulario ─────────────────────────────────────────── */}
         <form onSubmit={onSubmit} noValidate>
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 space-y-6">
+          <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-sm border border-slate-200 p-5 space-y-6">
 
             {/* ── BLOQUE 0: PDF de entrada + IA ────────────────────── */}
             <div className="space-y-3">
@@ -922,7 +858,7 @@ export default function RadicadoNuevo() {
                         })
                         setCreandoTerceroCtx('remitente')
                       }}
-                      className="px-3 py-1.5 text-xs bg-[#1B3A6E] text-white rounded-lg hover:bg-[#14306A] transition-colors font-medium"
+                      className="px-3 py-1.5 text-xs bg-[#0B1220] text-white rounded-lg hover:bg-[#060911] transition-colors font-medium"
                     >
                       + Registrar
                     </button>
@@ -975,7 +911,7 @@ export default function RadicadoNuevo() {
                         })
                         setCreandoFuncionarioCtx('remitente')
                       }}
-                      className="px-3 py-1.5 text-xs bg-[#1B3A6E] text-white rounded-lg hover:bg-[#14306A] transition-colors font-medium"
+                      className="px-3 py-1.5 text-xs bg-[#0B1220] text-white rounded-lg hover:bg-[#060911] transition-colors font-medium"
                     >
                       + Registrar
                     </button>
@@ -986,7 +922,7 @@ export default function RadicadoNuevo() {
 
             {/* Separador Paso 2 */}
             <div className="flex items-center gap-3 py-1">
-              <span className="text-[11px] font-bold text-[#1B3A6E] uppercase tracking-widest whitespace-nowrap">
+              <span className="text-[11px] font-bold text-[#0B1220] uppercase tracking-widest whitespace-nowrap">
                 {pdfEntrada ? 'Paso 2 — Verifica los datos' : 'Paso 2 — Completa los datos manualmente'}
               </span>
               <div className="flex-1 h-px bg-slate-200" />
@@ -1008,7 +944,7 @@ export default function RadicadoNuevo() {
                   </span>
                   <select
                     {...register('manejo')}
-                    className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#2B5BA8]"
+                    className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800]"
                   >
                     <option value="RESOLUTIVO">Resolutivo</option>
                     <option value="INFORMATIVO">Informativo</option>
@@ -1033,7 +969,7 @@ export default function RadicadoNuevo() {
                         limpiarRemitente()
                       }
                     }}
-                    className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#2B5BA8]"
+                    className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800]"
                   >
                     <option value="EXTERNO">Externa</option>
                     <option value="INTERNO">Interna</option>
@@ -1060,7 +996,7 @@ export default function RadicadoNuevo() {
                         // Sincronizar procedencia con tipo
                         setValue('procedencia', tipo === 'FUNCIONARIO' ? 'INTERNO' : 'EXTERNO')
                       }}
-                      className="accent-[#2B5BA8]"
+                      className="accent-[#C8A800]"
                     />
                     <span className="text-sm text-slate-700">
                       {{ TERCERO_NIT: 'Empresa (NIT)', CIUDADANO: 'Ciudadano', FUNCIONARIO: 'Funcionario' }[tipo]}
@@ -1125,7 +1061,7 @@ export default function RadicadoNuevo() {
                         <select
                           value={watch('nombre_persona_empresa') ?? ''}
                           onChange={e => setValue('nombre_persona_empresa', e.target.value)}
-                          className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#2B5BA8]"
+                          className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800]"
                         >
                           <option value="">— Seleccione o ingrese nuevo —</option>
                           {contactosEmpresa.map(c => (
@@ -1141,7 +1077,7 @@ export default function RadicadoNuevo() {
                             setTerceroDefaults({ tipo_identificacion_id: tiposIdentificacion.find(t => t.codigo?.toUpperCase() === 'NIT')?.id })
                             setCreandoTerceroCtx('remitente')
                           }}
-                          className="px-3 py-2 text-xs bg-[#1B3A6E] text-white rounded-lg hover:bg-[#14306A] transition-colors font-medium"
+                          className="px-3 py-2 text-xs bg-[#0B1220] text-white rounded-lg hover:bg-[#060911] transition-colors font-medium"
                         >
                           + Nuevo
                         </button>
@@ -1188,7 +1124,7 @@ export default function RadicadoNuevo() {
                           setContactosEmpresa(prev => [...prev, c])
                         })
                       }}
-                      className="px-3 py-1 text-xs bg-[#1B3A6E] text-white rounded-lg hover:bg-[#14306A] transition-colors font-medium shrink-0"
+                      className="px-3 py-1 text-xs bg-[#0B1220] text-white rounded-lg hover:bg-[#060911] transition-colors font-medium shrink-0"
                     >
                       + Registrar contacto
                     </button>
@@ -1259,147 +1195,50 @@ export default function RadicadoNuevo() {
               </div>
             </div>
 
-            {/* ── BLOQUE 5: Destino ──────────────────────────────────── */}
+            {/* ── BLOQUE 5: Destino (siempre una dependencia interna) ─── */}
             <div className="space-y-3">
               <SeccionTitulo titulo="Destino" />
-
-              {/* Tipo destino */}
-              <div className="flex flex-wrap gap-2">
-                {(['INTERNO', 'TERCERO_NIT', 'CIUDADANO'] as const).map(tipo => (
-                  <label key={tipo} className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      value={tipo}
-                      checked={watchTipoDestino === tipo}
-                      onChange={() => { setValue('tipo_destino', tipo); limpiarDestino() }}
-                      className="accent-[#2B5BA8]"
-                    />
-                    <span className="text-sm text-slate-700">
-                      {{ INTERNO: 'Dependencia interna', TERCERO_NIT: 'Empresa externa', CIUDADANO: 'Ciudadano externo' }[tipo]}
-                    </span>
-                  </label>
-                ))}
-              </div>
-
-              {/* Campos condicionales según tipo_destino */}
-              {watchTipoDestino === 'INTERNO' ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                  <LookupField
-                    label="Dependencia Destino *"
-                    code={String(watch('dependencia_destino_id') || '')}
-                    display={display.descripcionDepDestino}
-                    required
-                    maxLength={6}
-                    error={errors.dependencia_destino_id?.message}
-                    onSearch={() => setModalAbierto('depDestino')}
-                    onClear={limpiarDestino}
-                    className="lg:col-span-2"
-                  />
-                  <LookupField
-                    label="Responsable"
-                    code={String(watch('personal_destino_id') ?? '')}
-                    display={display.responsable}
-                    maxLength={10}
-                    onSearch={() => {
-                      if (!watch('dependencia_destino_id')) {
-                        toast.error('Seleccione primero la dependencia destino')
-                      } else {
-                        buscarPersonalDestino('')
-                        setModalAbierto('personalDestino')
-                      }
-                    }}
-                    onClear={() => { setValue('personal_destino_id', null); setDisplayField({ responsable: '' }) }}
-                    className="lg:col-span-2"
-                  />
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                  <LookupField
-                    label={watchTipoDestino === 'TERCERO_NIT' ? 'Empresa destino *' : 'Ciudadano destino *'}
-                    code={String(watch('tercero_destino_id') ?? '')}
-                    display={display.descripcionTerceroDestino}
-                    required
-                    maxLength={10}
-                    error={errors.tercero_destino_id?.message}
-                    onSearch={() => { buscarTercerosDestino(''); setModalAbierto('terceroDestino') }}
-                    onClear={() => { setValue('tercero_destino_id', null); setValue('nombre_persona_destino', ''); setDisplayField({ descripcionTerceroDestino: '' }); setContactosEmpresaDestino([]) }}
-                    className="lg:col-span-2"
-                  />
-                  {watchTipoDestino === 'TERCERO_NIT' && watch('tercero_destino_id') && (
-                    <div className="lg:col-span-2 flex flex-col gap-0.5">
-                      <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wide">
-                        Contacto en la empresa
-                      </span>
-                      {loadingContactosDestino ? (
-                        <div className="px-3 py-2 text-sm text-slate-400 border border-slate-200 rounded-lg bg-slate-50">
-                          Cargando contactos...
-                        </div>
-                      ) : contactosEmpresaDestino.length > 0 ? (
-                        <select
-                          value={watch('nombre_persona_destino') ?? ''}
-                          onChange={e => setValue('nombre_persona_destino', e.target.value)}
-                          className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#2B5BA8]"
-                        >
-                          <option value="">— Seleccione o escriba un nuevo nombre —</option>
-                          {contactosEmpresaDestino.map(c => (
-                            <option key={c.id} value={c.nombre_completo}>
-                              {c.nombre_completo}{c.cargo ? ` · ${c.cargo}` : ''}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <Controller
-                          control={control}
-                          name="nombre_persona_destino"
-                          render={({ field }) => (
-                            <CharCountInput
-                              {...field}
-                              label=""
-                              value={field.value ?? ''}
-                              maxLength={100}
-                              placeholder="Nombre del contacto en la empresa"
-                            />
-                          )}
-                        />
-                      )}
-                    </div>
-                  )}
-                </div>
+              {!destinoEditable && (
+                <p className="text-xs text-slate-400 -mt-1">
+                  {watchTipoCorrespondenciaId
+                    ? 'Dependencia asignada automáticamente según el tipo de correspondencia.'
+                    : 'Seleccione primero el tipo de correspondencia para asignar la dependencia destino.'}
+                </p>
               )}
 
-              {/* Banner: contacto de empresa destino no registrado */}
-              {watchTipoDestino === 'TERCERO_NIT' && watch('tercero_destino_id') && (() => {
-                const nombre = (watch('nombre_persona_destino') ?? '').trim()
-                if (!nombre) return null
-                const yaRegistrado = contactosEmpresaDestino.some(
-                  c => c.nombre_completo.toLowerCase() === nombre.toLowerCase()
-                )
-                if (yaRegistrado) return null
-                return (
-                  <div className="flex items-center gap-3 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-xl">
-                    <ExclamationTriangleIcon className="w-4 h-4 text-amber-500 shrink-0" />
-                    <p className="flex-1 text-xs text-amber-800">
-                      <strong>{nombre}</strong> no está registrado como contacto de esta empresa.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const id = watch('tercero_destino_id')
-                        if (!id) return
-                        registrarContacto(id, nombre, (c) => {
-                          setContactosEmpresaDestino(prev => [...prev, c])
-                        })
-                      }}
-                      className="px-3 py-1 text-xs bg-[#1B3A6E] text-white rounded-lg hover:bg-[#14306A] transition-colors font-medium shrink-0"
-                    >
-                      + Registrar contacto
-                    </button>
-                  </div>
-                )
-              })()}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <LookupField
+                  label="Dependencia Destino *"
+                  code={String(watch('dependencia_destino_id') || '')}
+                  display={display.descripcionDepDestino}
+                  required
+                  disabled={!destinoEditable}
+                  maxLength={6}
+                  error={errors.dependencia_destino_id?.message}
+                  onSearch={() => setModalAbierto('depDestino')}
+                  onClear={destinoEditable ? limpiarDestino : undefined}
+                  className="lg:col-span-2"
+                />
+                <LookupField
+                  label="Responsable"
+                  code={String(watch('personal_destino_id') ?? '')}
+                  display={display.responsable}
+                  maxLength={10}
+                  onSearch={() => {
+                    if (!watch('dependencia_destino_id')) {
+                      toast.error('Seleccione primero la dependencia destino')
+                    } else {
+                      buscarPersonalDestino('')
+                      setModalAbierto('personalDestino')
+                    }
+                  }}
+                  onClear={() => { setValue('personal_destino_id', null); setDisplayField({ responsable: '' }) }}
+                  className="lg:col-span-2"
+                />
+              </div>
 
               {/* Banner: destinatario no registrado */}
-              {destinoNoRegistrado && !watch('tercero_destino_id') && !watch('personal_destino_id') && (
+              {destinoNoRegistrado && !watch('personal_destino_id') && (
                 <div className="flex items-start gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl">
                   <ExclamationTriangleIcon className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
                   <div className="flex-1 min-w-0">
@@ -1408,9 +1247,7 @@ export default function RadicadoNuevo() {
                     </p>
                     <p className="text-xs text-amber-700 mt-0.5">
                       La IA detectó:{' '}
-                      <strong>
-                        {destinoNoRegistrado.nombre_empresa_destino || destinoNoRegistrado.nombre_destinatario || '—'}
-                      </strong>
+                      <strong>{destinoNoRegistrado.nombre_destinatario || '—'}</strong>
                       {destinoNoRegistrado.dependencia_destino && (
                         <> · <span>{destinoNoRegistrado.dependencia_destino}</span></>
                       )}
@@ -1420,13 +1257,12 @@ export default function RadicadoNuevo() {
                     <button
                       type="button"
                       onClick={() => {
-                        if (watchTipoDestino === 'INTERNO') {
-                          buscarPersonalDestino('')
-                          setModalAbierto('personalDestino')
-                        } else {
-                          buscarTercerosDestino('')
-                          setModalAbierto('terceroDestino')
+                        if (!watch('dependencia_destino_id')) {
+                          toast.error('Seleccione primero la dependencia destino')
+                          return
                         }
+                        buscarPersonalDestino('')
+                        setModalAbierto('personalDestino')
                       }}
                       className="px-3 py-1.5 text-xs border border-amber-300 text-amber-700 rounded-lg hover:bg-amber-100 transition-colors font-medium"
                     >
@@ -1435,44 +1271,19 @@ export default function RadicadoNuevo() {
                     <button
                       type="button"
                       onClick={() => {
-                        if (watchTipoDestino === 'INTERNO') {
-                          const nombre = destinoNoRegistrado.nombre_destinatario ?? ''
-                          const partes = nombre.trim().split(' ')
-                          const apellidos = partes.length > 2 ? partes.slice(-2).join(' ') : partes.slice(-1).join(' ')
-                          const nombres = partes.length > 2 ? partes.slice(0, -2).join(' ') : partes.slice(0, 1).join(' ')
-                          const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
-                          const depNombre = norm(destinoNoRegistrado.dependencia_destino ?? '')
-                          const allDeps = useCatalogoStore.getState().dependencias
-                          let depEncontrada = depNombre
-                            ? allDeps.find(d => { const n = norm(d.descripcion ?? ''); return n.includes(depNombre) || depNombre.includes(n) })
-                            : undefined
-                          // Mismo respaldo que en buscarDestinoIA: solicitud de
-                          // residencia sin dependencia específica → Despacho del Alcalde.
-                          if (!depEncontrada && destinoNoRegistrado.es_solicitud_residencia) {
-                            depEncontrada = allDeps.find(d => norm(d.descripcion ?? '').includes('despacho del alcalde'))
-                          }
-                          setFuncionarioDefaults({
-                            nombres,
-                            apellidos,
-                            cargo: destinoNoRegistrado.cargo_destinatario ?? '',
-                            dependencia_id: depEncontrada?.id,
-                          })
-                          setCreandoFuncionarioCtx('destino')
-                        } else {
-                          const esNit = watchTipoDestino === 'TERCERO_NIT'
-                          const tipoId = tiposIdentificacion.find(t => t.codigo?.toUpperCase() === (esNit ? 'NIT' : 'CC'))?.id ?? 0
-                          setTerceroDefaults({
-                            tipo_identificacion_id: tipoId,
-                            nro_identificacion: '',
-                            nombres: esNit
-                              ? (destinoNoRegistrado.nombre_empresa_destino ?? '')
-                              : (destinoNoRegistrado.nombre_destinatario ?? ''),
-                            nombre_contacto: esNit ? (destinoNoRegistrado.nombre_destinatario ?? '') : '',
-                          })
-                          setCreandoTerceroCtx('destino')
-                        }
+                        const nombre = destinoNoRegistrado.nombre_destinatario ?? ''
+                        const partes = nombre.trim().split(' ')
+                        const apellidos = partes.length > 2 ? partes.slice(-2).join(' ') : partes.slice(-1).join(' ')
+                        const nombres = partes.length > 2 ? partes.slice(0, -2).join(' ') : partes.slice(0, 1).join(' ')
+                        setFuncionarioDefaults({
+                          nombres,
+                          apellidos,
+                          cargo: destinoNoRegistrado.cargo_destinatario ?? '',
+                          dependencia_id: watch('dependencia_destino_id') ?? undefined,
+                        })
+                        setCreandoFuncionarioCtx('destino')
                       }}
-                      className="px-3 py-1.5 text-xs bg-[#1B3A6E] text-white rounded-lg hover:bg-[#14306A] transition-colors font-medium"
+                      className="px-3 py-1.5 text-xs bg-[#0B1220] text-white rounded-lg hover:bg-[#060911] transition-colors font-medium"
                     >
                       + Registrar
                     </button>
@@ -1493,7 +1304,7 @@ export default function RadicadoNuevo() {
                     min={1}
                     {...register('folios', { valueAsNumber: true })}
                     placeholder="0"
-                    className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#2B5BA8]"
+                    className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800]"
                   />
                 </div>
 
@@ -1504,7 +1315,7 @@ export default function RadicadoNuevo() {
                     min={1}
                     {...register('folios_de', { valueAsNumber: true })}
                     placeholder="0"
-                    className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#2B5BA8]"
+                    className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800]"
                   />
                 </div>
 
@@ -1522,7 +1333,7 @@ export default function RadicadoNuevo() {
                             setTieneAnexos(val)
                             if (!val) syncAnexos([])
                           }}
-                          className="accent-[#2B5BA8]"
+                          className="accent-[#C8A800]"
                         />
                         {val ? 'Sí' : 'No'}
                       </label>
@@ -1538,7 +1349,7 @@ export default function RadicadoNuevo() {
                     <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wide">
                       Descripción de anexos
                       {anexosItems.filter(i => i.descripcion.trim()).length > 0 && (
-                        <span className="ml-1.5 text-[#2B5BA8] font-semibold">
+                        <span className="ml-1.5 text-[#C8A800] font-semibold">
                           ({anexosItems.filter(i => i.descripcion.trim()).length})
                         </span>
                       )}
@@ -1546,7 +1357,7 @@ export default function RadicadoNuevo() {
                     <button
                       type="button"
                       onClick={() => syncAnexos([...anexosItems, { descripcion: '', tipo_id: null, archivo: null }])}
-                      className="text-xs text-[#2B5BA8] hover:text-[#1B3A6E] font-medium flex items-center gap-1 transition-colors"
+                      className="text-xs text-[#C8A800] hover:text-[#0B1220] font-medium flex items-center gap-1 transition-colors"
                     >
                       + Agregar anexo
                     </button>
@@ -1573,7 +1384,7 @@ export default function RadicadoNuevo() {
                               updated[idx] = { ...updated[idx], descripcion: e.target.value }
                               syncAnexos(updated)
                             }}
-                            className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#2B5BA8]"
+                            className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800]"
                           />
                           <select
                             value={item.tipo_id ?? ''}
@@ -1582,7 +1393,7 @@ export default function RadicadoNuevo() {
                               updated[idx] = { ...updated[idx], tipo_id: e.target.value ? Number(e.target.value) : null }
                               syncAnexos(updated)
                             }}
-                            className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#2B5BA8] text-slate-600"
+                            className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800] text-slate-600"
                           >
                             <option value="">Tipo de anexo...</option>
                             {tiposAnexo.map(t => (
@@ -1597,7 +1408,7 @@ export default function RadicadoNuevo() {
                               updated[idx] = { ...updated[idx], archivo: e.target.files?.[0] ?? null }
                               syncAnexos(updated)
                             }}
-                            className="text-xs text-slate-500 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-blue-50 file:text-[#2B5BA8] hover:file:bg-blue-100"
+                            className="text-xs text-slate-500 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-blue-50 file:text-[#C8A800] hover:file:bg-blue-100"
                           />
                         </div>
                         <button
@@ -1623,7 +1434,7 @@ export default function RadicadoNuevo() {
                   <input
                     type="date"
                     {...register('fecha_documento')}
-                    className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#2B5BA8]"
+                    className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800]"
                   />
                 </div>
 
@@ -1632,7 +1443,7 @@ export default function RadicadoNuevo() {
                   <input
                     type="date"
                     {...register('fecha_entrega')}
-                    className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#2B5BA8]"
+                    className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800]"
                   />
                 </div>
 
@@ -1642,7 +1453,7 @@ export default function RadicadoNuevo() {
                   <select
                     {...register('medio_ingreso_id', { valueAsNumber: true })}
                     className={cn(
-                      'px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#2B5BA8]',
+                      'px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800]',
                       errors.medio_ingreso_id ? 'border-red-300' : 'border-slate-300',
                     )}
                   >
@@ -1656,46 +1467,6 @@ export default function RadicadoNuevo() {
                   )}
                 </div>
 
-                {/* Nro guía — solo si mensajería */}
-                {requiereGuia && (
-                  <Controller
-                    control={control}
-                    name="nro_guia"
-                    render={({ field }) => (
-                      <CharCountInput
-                        {...field}
-                        value={field.value ?? ''}
-                        label="Nro. Guía"
-                        maxLength={30}
-                        placeholder="Número de guía"
-                      />
-                    )}
-                  />
-                )}
-
-                <Controller
-                  control={control}
-                  name="nro_factura"
-                  render={({ field }) => (
-                    <CharCountInput
-                      {...field}
-                      value={field.value ?? ''}
-                      label="Nro. Factura"
-                      maxLength={30}
-                      placeholder="Opcional"
-                    />
-                  )}
-                />
-
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wide">Valor Factura</span>
-                  <input
-                    type="text"
-                    {...register('valor_factura')}
-                    placeholder="$0"
-                    className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#2B5BA8]"
-                  />
-                </div>
               </div>
             </div>
 
@@ -1846,24 +1617,6 @@ export default function RadicadoNuevo() {
         labelCrear="+ Registrar Funcionario"
       />
       <SearchModal
-        open={modalAbierto === 'terceroDestino'}
-        title={watchTipoDestino === 'TERCERO_NIT' ? 'Buscar Empresa destino' : 'Buscar Ciudadano destino'}
-        columns={COL_TERCERO}
-        data={terceroDestinoRows}
-        isLoading={terceroDestinoLoading}
-        searchPlaceholder={watchTipoDestino === 'TERCERO_NIT' ? 'Buscar por NIT o razón social...' : 'Buscar por cédula o nombre...'}
-        onQueryChange={buscarTercerosDestino}
-        onSelect={selectTerceroDestino}
-        onClose={() => setModalAbierto(null)}
-        onCrear={() => {
-          const esNit = watchTipoDestino === 'TERCERO_NIT'
-          const tipoId = tiposIdentificacion.find(t => t.codigo?.toUpperCase() === (esNit ? 'NIT' : 'CC'))?.id ?? 0
-          setTerceroDefaults({ tipo_identificacion_id: tipoId })
-          setCreandoTerceroCtx('destino')
-        }}
-        labelCrear={watchTipoDestino === 'TERCERO_NIT' ? '+ Registrar Empresa' : '+ Registrar Ciudadano'}
-      />
-      <SearchModal
         open={modalAbierto === 'depRemitente'}
         title="Dependencia Remitente"
         columns={COL_DEPENDENCIA}
@@ -1873,13 +1626,12 @@ export default function RadicadoNuevo() {
         onClose={() => setModalAbierto(null)}
       />
 
-      {/* ── Modal crear tercero (remitente o destino según contexto) ─── */}
+      {/* ── Modal crear tercero (remitente) ───────────────────────────── */}
       <CrearTerceroModal
         open={creandoTerceroCtx !== null}
         onClose={() => { setCreandoTerceroCtx(null); setTerceroDefaults(undefined) }}
         onCreado={(t, nombreContacto) => {
-          if (creandoTerceroCtx === 'remitente') handleTerceroCreado(t, nombreContacto)
-          else handleTerceroDestinoCreado(t, nombreContacto)
+          handleTerceroCreado(t, nombreContacto)
           setCreandoTerceroCtx(null)
           setTerceroDefaults(undefined)
         }}
