@@ -32,6 +32,7 @@ class SolicitudCartaResidenciaController extends Controller
         $data = $request->validate([
             'pdf_solicitud'          => ['required', 'file', 'mimes:pdf', 'max:20480'],
             'soporte'                => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:20480'],
+            'documento_identidad'    => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:20480'],
             'nombre_completo'        => ['required', 'string', 'max:150'],
             'tipo_documento'         => ['required', 'string', 'max:10'],
             'numero_identificacion'  => ['required', 'string', 'max:20'],
@@ -100,7 +101,18 @@ class SolicitudCartaResidenciaController extends Controller
             "Referencia CDR: {$data['referencia_cdr']}",
         ])));
 
+        // 'documento_identidad' y 'soporte' se guardan ambos como anexos del
+        // radicado (RadicadoDocumento tipo ANEXO) — 'radicado_documentos.tipo'
+        // es un enum de Postgres fijo (ENTRADA/SALIDA/ANEXO), así que no se
+        // agrega un valor nuevo solo para distinguirlos; la 'descripcion' de
+        // cada anexo ya deja claro cuál es cuál.
         $anexos = [];
+        if ($request->hasFile('documento_identidad')) {
+            $anexos[] = [
+                'descripcion' => 'Documento de identidad (CDR)',
+                'archivo'     => $request->file('documento_identidad'),
+            ];
+        }
         if ($request->hasFile('soporte')) {
             $anexos[] = [
                 'descripcion' => 'Soporte de acreditación (CDR)',
