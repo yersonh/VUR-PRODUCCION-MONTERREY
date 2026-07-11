@@ -4,12 +4,11 @@ import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 import toast from 'react-hot-toast'
 import {
-  ArrowLeftIcon, PencilSquareIcon, DocumentArrowDownIcon,
+  ArrowLeftIcon, DocumentArrowDownIcon,
   ArrowPathIcon, NoSymbolIcon, CheckCircleIcon,
   ClockIcon, DocumentCheckIcon, SparklesIcon,
   TrashIcon, PaperClipIcon,
 } from '@heroicons/react/24/outline'
-import { motion } from 'framer-motion'
 
 import { AppLayout } from '@/components/layout/AppLayout'
 import { EstadoBadge } from '@/components/ui/EstadoBadge'
@@ -20,23 +19,6 @@ import { formatNumeroRadicado, cn } from '@/lib/utils'
 import type { Radicado, EstadoRadicado, RadicadoActuacion } from '@/types'
 import { useAuthStore } from '@/store/authStore'
 import { useCatalogoStore } from '@/store/catalogoStore'
-
-// ── Transiciones de estado permitidas ─────────────────────────────
-const TRANSICIONES: Record<EstadoRadicado, EstadoRadicado[]> = {
-  RADICADO:   ['EN_TRAMITE', 'ANULADO'],
-  EN_TRAMITE: ['RESPONDIDO', 'CERRADO'],
-  RESPONDIDO: ['CERRADO'],
-  CERRADO:    [],
-  ANULADO:    [],
-}
-
-const ESTADO_LABELS: Record<EstadoRadicado, string> = {
-  RADICADO:   'Radicado',
-  EN_TRAMITE: 'En Trámite',
-  RESPONDIDO: 'Respondido',
-  CERRADO:    'Cerrado',
-  ANULADO:    'Anulado',
-}
 
 // ── Campo readonly ─────────────────────────────────────────────────
 function Campo({ label, value, mono }: { label: string; value?: string | number | null; mono?: boolean }) {
@@ -101,110 +83,6 @@ function TimelineActuacion({ actuacion, isLast }: { actuacion: RadicadoActuacion
   )
 }
 
-// ── Modal cambio de estado ─────────────────────────────────────────
-interface CambiarEstadoModalProps {
-  open: boolean
-  estadoActual: EstadoRadicado
-  onCambiar: (estado: EstadoRadicado, observacion: string) => void
-  onClose: () => void
-  guardando: boolean
-}
-
-function CambiarEstadoModal({ open, estadoActual, onCambiar, onClose, guardando }: CambiarEstadoModalProps) {
-  const [estadoSel, setEstadoSel] = useState<EstadoRadicado | ''>('')
-  const [observacion, setObservacion] = useState('')
-  const opciones = TRANSICIONES[estadoActual] ?? []
-
-  useEffect(() => {
-    if (open) { setEstadoSel(''); setObservacion('') }
-  }, [open])
-
-  if (!open) return null
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1, transition: { duration: 0.18 } }}
-        className="relative w-full max-w-md bg-white/90 backdrop-blur-sm rounded-2xl shadow-2xl overflow-hidden"
-      >
-        <div className="bg-[#0B1220] px-5 py-4">
-          <h3 className="text-white font-semibold text-sm">Cambiar Estado del Radicado</h3>
-          <p className="text-blue-200 text-xs mt-0.5">Estado actual: <strong>{ESTADO_LABELS[estadoActual]}</strong></p>
-        </div>
-        <div className="p-5 space-y-4">
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-medium text-slate-500 uppercase tracking-wide">Nuevo estado *</label>
-            <div className="flex flex-col gap-2">
-              {opciones.map(op => (
-                <label key={op} className={cn(
-                  'flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all',
-                  estadoSel === op
-                    ? 'border-[#C8A800] bg-blue-50'
-                    : 'border-slate-200 hover:border-slate-300',
-                )}>
-                  <input
-                    type="radio"
-                    name="estado_nuevo"
-                    value={op}
-                    checked={estadoSel === op}
-                    onChange={() => setEstadoSel(op)}
-                    className="accent-[#C8A800]"
-                  />
-                  <span className="flex-1">
-                    <EstadoBadge estado={op} />
-                  </span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-medium text-slate-500 uppercase tracking-wide">
-              Observación {estadoSel === 'ANULADO' && <span className="text-red-500">*</span>}
-            </label>
-            <div className="relative">
-              <textarea
-                value={observacion}
-                onChange={e => setObservacion(e.target.value)}
-                maxLength={300}
-                rows={3}
-                placeholder="Motivo del cambio de estado..."
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800] resize-none"
-              />
-              <span className={cn(
-                'absolute bottom-2 right-2.5 text-[10px]',
-                observacion.length >= 270 ? 'text-red-400' : 'text-slate-400',
-              )}>
-                {observacion.length}/300
-              </span>
-            </div>
-          </div>
-        </div>
-        <div className="flex gap-3 px-5 pb-5">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={guardando}
-            className="flex-1 py-2.5 border border-slate-300 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors disabled:opacity-50"
-          >
-            Cancelar
-          </button>
-          <button
-            type="button"
-            onClick={() => estadoSel && onCambiar(estadoSel, observacion)}
-            disabled={!estadoSel || guardando || (estadoSel === 'ANULADO' && !observacion.trim())}
-            className="flex-1 py-2.5 bg-[#0B1220] hover:bg-[#060911] text-white rounded-xl text-sm font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {guardando ? 'Guardando...' : 'Confirmar cambio'}
-          </button>
-        </div>
-      </motion.div>
-    </div>
-  )
-}
-
 // ── Página principal ──────────────────────────────────────────────
 export default function RadicadoDetalle() {
   const { id } = useParams<{ id: string }>()
@@ -214,9 +92,7 @@ export default function RadicadoDetalle() {
 
   const [radicado, setRadicado] = useState<Radicado | null>(null)
   const [cargando, setCargando] = useState(true)
-  const [modalEstado, setModalEstado] = useState(false)
   const [confirmAnular, setConfirmAnular] = useState(false)
-  const [guardandoEstado, setGuardandoEstado] = useState(false)
   const [subiendoPdfSalida, setSubiendoPdfSalida] = useState(false)
   const [pdfSalida, setPdfSalida] = useState<File | null>(null)
 
@@ -243,21 +119,6 @@ export default function RadicadoDetalle() {
       navigate('/radicados')
     } finally {
       setCargando(false)
-    }
-  }
-
-  const handleCambiarEstado = async (estado: EstadoRadicado, observacion: string) => {
-    if (!radicado) return
-    setGuardandoEstado(true)
-    try {
-      const actualizado = await radicadoService.cambiarEstado(radicado.id, estado, observacion)
-      setRadicado(actualizado)
-      setModalEstado(false)
-      toast.success(`Estado cambiado a ${ESTADO_LABELS[estado]}`)
-    } catch {
-      toast.error('Error al cambiar el estado')
-    } finally {
-      setGuardandoEstado(false)
     }
   }
 
@@ -344,7 +205,6 @@ export default function RadicadoDetalle() {
 
   const estadoActual = radicado?.estado?.codigo as EstadoRadicado | undefined
   const puedeAnular = esAdmin && estadoActual && !['CERRADO', 'ANULADO'].includes(estadoActual)
-  const puedeCambiarEstado = estadoActual && TRANSICIONES[estadoActual]?.length > 0
   const puedeEditarAnexos = estadoActual && !['CERRADO', 'ANULADO'].includes(estadoActual)
   const tienePdfEntrada = (radicado?.documentos ?? []).some(d => d.tipo === 'ENTRADA')
   const tienePdfSalida = (radicado?.documentos ?? []).some(d => d.tipo === 'SALIDA')
@@ -412,16 +272,6 @@ export default function RadicadoDetalle() {
             >
               <ArrowPathIcon className="w-4 h-4" />
             </button>
-
-            {puedeCambiarEstado && (
-              <button
-                type="button"
-                onClick={() => setModalEstado(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-[#C8A800] hover:bg-[#0B1220] text-white rounded-xl text-sm font-medium transition-colors"
-              >
-                <PencilSquareIcon className="w-4 h-4" /> Cambiar Estado
-              </button>
-            )}
 
             {puedeAnular && (
               <button
@@ -765,14 +615,6 @@ export default function RadicadoDetalle() {
       </div>
 
       {/* ── Modales ───────────────────────────────────────────────── */}
-      <CambiarEstadoModal
-        open={modalEstado}
-        estadoActual={estadoActual ?? 'RADICADO'}
-        onCambiar={handleCambiarEstado}
-        onClose={() => setModalEstado(false)}
-        guardando={guardandoEstado}
-      />
-
       <ConfirmDialog
         open={confirmAnular}
         title="¿Anular radicado?"

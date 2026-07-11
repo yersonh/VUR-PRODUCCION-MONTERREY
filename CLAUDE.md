@@ -39,7 +39,7 @@ php artisan migrate:fresh --seed
 - **PHP 8.3 + Laravel 13** with PostgreSQL (production) / SQLite (dev)
 - **Redis** for sessions, cache, and queues
 - **Laravel Sanctum** — Bearer token auth for SPA
-- **Spatie Laravel Permission** — Roles: `ADMIN`, `OPERADOR`, `JEFE_DEPENDENCIA`, `FUNCIONARIO`
+- **Spatie Laravel Permission** — Roles: `ADMIN`, `OPERADOR`, `FUNCIONARIO`
 - **Google Gemini Flash 2.5** — PDF analysis via `GeminiService`
 - **Brevo REST API** — Email (not SMTP) via `BrevoMailService`
 
@@ -53,9 +53,11 @@ The main domain entity is `Radicado` — a correspondence record with soft delet
 
 `Radicado` update uses `POST /radicados/{id}` instead of `PUT` because browsers can't send multipart/form-data via PUT — the controller handles this transparently.
 
-Expected `EstadoCorrespondencia` codes (seeded): `RADICADO`, `EN_TRAMITE`, `RESPONDIDO`, `CERRADO`, `ANULADO`. `RADICADO` is always the initial status on creation.
+Expected `EstadoCorrespondencia` codes (seeded): `RADICADO`, `EN_TRAMITE`, `RESPONDIDO`, `CERRADO`, `ANULADO`. `RADICADO` is kept only for historical rows — new radicados are created directly in `EN_TRAMITE` (`RadicadoService::crear()` skips the `RADICADO` step). There is no manual "cambiar estado" UI; `RESPONDIDO` happens automatically when the response PDF is attached, and `ANULADO` is the only state reachable via a manual action (admin-only "Anular" button).
 
 Local catalogs (own tables, read-only in normal use): `TipoCorrespondencia`, `TipoAnexo`, `AuxTip` (optionally scoped to a `TipoCorrespondencia` via nullable `tipo_correspondencia_id`), `MedioIngreso`, `EstadoCorrespondencia`.
+
+A `Radicado`'s destino is always an internal dependencia (never an external tercero/ciudadano) — `Radicado.dependencia_destino_id` is `required` in `RadicadoController::reglasValidacion()`. Each `TipoCorrespondencia` carries its own default `dependencia_destino_id` (set via the admin catalog), and the frontend auto-fills/locks the destino dependencia field from that default when the user picks a tipo de correspondencia — unless `GeminiService`'s PDF analysis already detected a destino dependencia, in which case that detection wins and later tipo-de-correspondencia changes don't override it. The legacy `tipo_destino`/`tercero_destino_id`/`nombre_persona_destino` columns on `Radicado` still exist for historical rows but are no longer written on create.
 
 ### Core Institucional integration
 
@@ -64,8 +66,8 @@ VUR does **not** own its master data for people/companies/departments — that d
 - **Dependencias** and **tipos de identificación**: read-only catalogs from the Core (`ClienteCore::dependencias()`, cached 5 min; `tiposIdentificacion()`, cached 1 hour). The Core's field is `nombre`, not `descripcion` — controllers remap it before returning JSON to keep the frontend's `Dependencia { descripcion }` shape.
 - **Funcionarios** (`funcionario_id`/`personal_destino_id` columns on `Radicado` and elsewhere): fetched/created via `ClienteCore::funcionario()`/`crearFuncionarioConPersona()`. A funcionario wraps a `persona` (identification/contact data) + a `dependencia_id`/`cargo`.
 - **Ciudadanos** and **empresas** (the two `Tercero.categoria` values): fetched/created via `ClienteCore::ciudadano()`/`empresa()` and `crearCiudadano()`/`crearEmpresa()`.
-- **`Tercero`** is now a thin local bridge table — `{id, codigo, categoria, core_id}` — not a data table. It exists only so `Radicado.tercero_id`/`tercero_destino_id` have a stable local FK to point to; the actual name/NIT/email etc. are always fetched live from the Core (`TerceroController`/`RadicadoService::terceroInfo()` do a find-or-create on this bridge table keyed by `{categoria, core_id}`). `TerceroContacto` (a contact person for an EMPRESA, e.g. "who to address correspondence to") is VUR-only — the Core has no such concept — and references the Core's `empresa_id` directly (no local FK).
-- Columns like `funcionario_id`, `personal_destino_id`, `dependencia_remitente_id`, `dependencia_destino_id` on `Radicado`/`User`/etc. are **plain integer columns, not FKs** — they hold the Core's own id. Look at `RadicadoService`'s `dependenciaInfo()`/`funcionarioInfo()`/`terceroInfo()` helpers for the pattern to resolve them into display data; don't add an Eloquent `belongsTo` for them.
+- **`Tercero`** is now a thin local bridge table — `{id, codigo, categoria, core_id}` — not a data table. It exists only so `Radicado.tercero_id` (remitente) has a stable local FK to point to; the actual name/NIT/email etc. are always fetched live from the Core (`TerceroController`/`RadicadoService::terceroInfo()` do a find-or-create on this bridge table keyed by `{categoria, core_id}`). `TerceroContacto` (a contact person for an EMPRESA, e.g. "who to address correspondence to") is VUR-only — the Core has no such concept — and references the Core's `empresa_id` directly (no local FK).
+- Columns like `funcionario_id`, `personal_destino_id`, `dependencia_remitente_id`, `dependencia_destino_id` on `Radicado`/`User`/`TipoCorrespondencia`/etc. are **plain integer columns, not FKs** — they hold the Core's own id. Look at `RadicadoService`'s `dependenciaInfo()`/`funcionarioInfo()`/`terceroInfo()` helpers for the pattern to resolve them into display data; don't add an Eloquent `belongsTo` for them.
 
 **Known Core API limitations** (don't assume otherwise without checking with whoever owns the Core):
 - No free-text search on `funcionarios`/`ciudadanos`/`empresas`/`personas` — only exact filters (`nit`, or `tipo_identificacion_id`+`numero_identificacion` together for personas/ciudadanos). Controllers that need "search as you type" (e.g. `PersonalController`, `TerceroController`) fetch a page and filter client-side in PHP — this only searches within that page, not the whole dataset.
@@ -139,16 +141,16 @@ Defined in `radicacion-frontend/src/index.css`. Do not deviate from these tokens
 
 | Token | Value | Use |
 |-------|-------|-----|
-| Primary dark | `#1B3A6E` | Headers, sidebar |
-| Primary bright | `#2B5BA8` | Buttons, links, focus rings |
-| Primary light | `#DBEAFE` | Backgrounds, badges |
-| Accent gold | `#C8A800` | Secondary highlights |
-| BG neutral | `#F1F5F9` | Page backgrounds |
+| Primary dark | `#0B1220` | Headers, sidebar, footer |
+| Primary bright / accent | `#C8A800` | Buttons, links, focus rings, active nav |
+| Primary light | `#1A2E28` | Soft dark-glass backgrounds, badges |
+| Success / teal accent | `#1F8C6F` | Secondary highlights, gradients |
+| BG neutral | `#F1F5F9` | Light page backgrounds (forms, tables) |
 | Border | `#CBD5E1` | Card/input borders |
 | Text primary | `#1E293B` | Body text |
 | Text muted | `#64748B` | Labels, placeholders |
 
-Font: Inter. Focus ring: `2px solid #2B5BA8`.
+Font: Inter. Focus ring: `2px solid #C8A800`.
 
 ## Deployment
 

@@ -9,6 +9,7 @@ use App\Models\RadicadoActuacion;
 use App\Models\RadicadoDocumento;
 use App\Models\Tercero;
 use App\Models\TipoCorrespondencia;
+use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -69,8 +70,9 @@ class RadicadoService
                 ? $hoy->copy()->addWeekdays($tipoCorr->max_dias)->toDateString()
                 : null;
 
-            // Estado inicial
-            $estadoInicial = EstadoCorrespondencia::where('codigo', 'RADICADO')->firstOrFail();
+            // Estado inicial: se salta 'RADICADO' y arranca directo en
+            // 'EN_TRAMITE' — ya no hay un paso manual para esa transición.
+            $estadoInicial = EstadoCorrespondencia::where('codigo', 'EN_TRAMITE')->firstOrFail();
 
             $radicado = Radicado::create(array_merge($datos, [
                 'nro_radicado'    => $nro,
@@ -120,8 +122,23 @@ class RadicadoService
                 EnviarSolicitudResidenciaACdr::dispatch($radicado->id)->afterCommit();
             }
 
-            // Notificar a la dependencia destino (sistema interno)
+            // Notificar al responsable/dependencia destino (sistema interno)
             $this->notificacion->notificarNuevoRadicado($radicado, $operadorId);
+
+            // Si el destino tiene un funcionario específico con email conocido
+            // en el Core, avisarle también por correo (más confiable que
+            // esperar a que entre a revisar notificaciones in-app).
+            $responsableInfo = $this->funcionarioInfo($radicado->personal_destino_id);
+            if ($responsableInfo && !empty($responsableInfo['email'])) {
+                $this->brevo->notificarDependenciaDestino(
+                    emailDestino:         $responsableInfo['email'],
+                    nombreDestino:        $responsableInfo['nombre_completo'],
+                    numeroRadicado:       $radicado->numeroRadicado,
+                    remitente:            $this->nombreRemitente($radicado),
+                    tipoCorrespondencia:  $radicado->tipoCorrespondencia?->descripcion ?? '',
+                    asunto:               $radicado->aux_descripcion ?? '',
+                );
+            }
 
             // Correo de confirmación al remitente si tiene email
             $emailRemitente  = $this->emailRemitente($radicado);
@@ -136,6 +153,7 @@ class RadicadoService
                     tipoCorrespondencia:    $radicado->tipoCorrespondencia?->descripcion ?? '',
                     dependenciaDestino:     $this->dependenciaInfo($radicado->dependencia_destino_id)['descripcion'] ?? '',
                     fechaLimite:            $radicado->fecha_limite,
+                    responsable:            $responsableInfo['nombre_completo'] ?? null,
                 );
             }
 
@@ -146,7 +164,7 @@ class RadicadoService
     /**
      * Cambia el estado de un radicado y registra la actuación.
      */
-    public function cambiarEstado(Radicado $radicado, string $codigoEstado, string $observacion, int $usuarioId): Radicado
+    public function cambiarEstado(Radicado $radicado, string $codigoEstado, string $observacion, int $usuarioId, bool $notificar = true): Radicado
     {
         $estadoAnterior = $radicado->estado;
         $estadoNuevo    = EstadoCorrespondencia::where('codigo', $codigoEstado)->firstOrFail();
@@ -164,13 +182,19 @@ class RadicadoService
         });
 
         $radicado->load('estado');
-        $this->notificacion->notificarCambioEstado($radicado, $usuarioId);
+        if ($notificar) {
+            $this->notificacion->notificarCambioEstado($radicado, $usuarioId);
+        }
 
         return $radicado->fresh($this->relaciones());
     }
 
     /**
-     * Adjunta un PDF al radicado (para agregar PDF de salida posterior).
+     * Adjunta el PDF de salida (la respuesta) al radicado. Solo debe llamarse
+     * después de validar RadicadoService::puedeResponder() — este método no
+     * repite ese chequeo. Al adjuntarlo, el radicado pasa automáticamente a
+     * RESPONDIDO (subir la respuesta ES la acción de responder) y se avisa
+     * al operador que radicó la entrada y al remitente.
      */
     public function adjuntarPdfSalida(Radicado $radicado, UploadedFile $file, int $usuarioId): Radicado
     {
@@ -184,7 +208,69 @@ class RadicadoService
             $this->adjuntarPdf($radicado, $file, 'SALIDA', $usuarioId);
         });
 
+        $radicado->load('estado');
+        if (!$radicado->estado?->es_terminal) {
+            $radicado = $this->cambiarEstado($radicado, 'RESPONDIDO', 'Respuesta adjuntada por el responsable', $usuarioId, notificar: false);
+        }
+
+        $this->notificarRespuestaDisponible($radicado, $usuarioId);
+
         return $radicado->fresh($this->relaciones());
+    }
+
+    /**
+     * Avisa (in-app + correo) al operador que radicó la entrada y al
+     * remitente de que ya hay respuesta disponible para su radicado.
+     */
+    private function notificarRespuestaDisponible(Radicado $radicado, int $ejecutorId): void
+    {
+        $this->notificacion->notificarRespuestaCargada($radicado, $ejecutorId);
+
+        $fechaRespuesta = now()->format('d/m/Y');
+
+        if ($radicado->operador && $radicado->operador->id !== $ejecutorId && $radicado->operador->email) {
+            $this->brevo->enviarRespuestaDisponible(
+                email:           $radicado->operador->email,
+                nombre:          $radicado->operador->name,
+                numeroRadicado:  $radicado->numeroRadicado,
+                fechaRespuesta:  $fechaRespuesta,
+            );
+        }
+
+        $emailRemitente = $this->emailRemitente($radicado);
+        if ($emailRemitente) {
+            $this->brevo->enviarRespuestaDisponible(
+                email:           $emailRemitente,
+                nombre:          $this->nombreRemitente($radicado),
+                numeroRadicado:  $radicado->numeroRadicado,
+                fechaRespuesta:  $fechaRespuesta,
+            );
+        }
+    }
+
+    /**
+     * Determina si el usuario autenticado puede adjuntar la respuesta
+     * (PDF de salida) de este radicado. ADMIN siempre puede; si el radicado
+     * tiene un funcionario responsable asignado, solo esa persona (por
+     * funcionario_id); si no, cualquiera de la dependencia destino.
+     */
+    public function puedeResponder(Radicado $radicado, ?User $user): bool
+    {
+        if (!$user) {
+            return false;
+        }
+
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        if ($radicado->personal_destino_id) {
+            return $user->funcionario_id !== null
+                && (int) $user->funcionario_id === (int) $radicado->personal_destino_id;
+        }
+
+        return $user->dependencia_id !== null
+            && (int) $user->dependencia_id === (int) $radicado->dependencia_destino_id;
     }
 
     /**

@@ -12,6 +12,7 @@ export interface RadicadoFiltros {
   tipo_correspondencia_id?: number
   dependencia_destino_id?: number
   remitente?: string
+  asignados_a_mi?: boolean
 }
 
 export interface RadicadoListItem {
@@ -60,11 +61,6 @@ const radicadoService = {
     const res = await api.post<{ data: Radicado }>(`/radicados/${id}`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
-    return res.data.data
-  },
-
-  cambiarEstado: async (id: number, estado: EstadoRadicado, observacion?: string): Promise<Radicado> => {
-    const res = await api.patch<{ data: Radicado }>(`/radicados/${id}/estado`, { estado, observacion })
     return res.data.data
   },
 
