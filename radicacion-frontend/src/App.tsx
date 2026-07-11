@@ -13,6 +13,8 @@ const DependenciasAdmin = lazy(() => import('@/pages/admin/DependenciasAdmin'))
 const TiposCorrespondenciaAdmin = lazy(() => import('@/pages/admin/TiposCorrespondenciaAdmin'))
 const UsuariosAdmin = lazy(() => import('@/pages/admin/UsuariosAdmin'))
 const PersonalAdmin = lazy(() => import('@/pages/admin/PersonalAdmin'))
+const CiudadanosAdmin = lazy(() => import('@/pages/admin/CiudadanosAdmin'))
+const EmpresasAdmin = lazy(() => import('@/pages/admin/EmpresasAdmin'))
 const CatalogosAdmin = lazy(() => import('@/pages/admin/CatalogosAdmin'))
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -107,6 +109,14 @@ export default function App() {
         <Route
           path="/admin/personal"
           element={<AdminRoute><PersonalAdmin /></AdminRoute>}
+        />
+        <Route
+          path="/admin/ciudadanos"
+          element={<AdminRoute><CiudadanosAdmin /></AdminRoute>}
+        />
+        <Route
+          path="/admin/empresas"
+          element={<AdminRoute><EmpresasAdmin /></AdminRoute>}
         />
         <Route
           path="/admin/catalogos"

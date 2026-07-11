@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   HomeIcon, InboxArrowDownIcon, MagnifyingGlassIcon,
   UsersIcon, BuildingOffice2Icon, DocumentTextIcon,
-  UserGroupIcon, Cog8ToothIcon,
+  UserGroupIcon, Cog8ToothIcon, IdentificationIcon,
+  BuildingOfficeIcon,
 } from '@heroicons/react/24/outline'
 import { useAuthStore } from '@/store/authStore'
 import { cn } from '@/lib/utils'
@@ -69,6 +70,18 @@ const NAV_SECTIONS = [
         to: '/admin/personal',
         icon: <UserGroupIcon className="w-4.5 h-4.5" />,
         label: 'Personal',
+        adminOnly: true,
+      },
+      {
+        to: '/admin/ciudadanos',
+        icon: <IdentificationIcon className="w-4.5 h-4.5" />,
+        label: 'Ciudadanos',
+        adminOnly: true,
+      },
+      {
+        to: '/admin/empresas',
+        icon: <BuildingOfficeIcon className="w-4.5 h-4.5" />,
+        label: 'Empresas',
         adminOnly: true,
       },
       {

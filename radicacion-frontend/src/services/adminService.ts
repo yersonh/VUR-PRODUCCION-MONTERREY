@@ -1,5 +1,5 @@
 import api, { parsePaginated } from '@/services/api'
-import type { Dependencia, TipoCorrespondencia, AuxTip, TipoAnexo, MedioIngreso, User, Role } from '@/types'
+import type { Dependencia, TipoCorrespondencia, AuxTip, TipoAnexo, MedioIngreso, User, Role, TipoIdentificacion } from '@/types'
 import type { PaginatedResponse } from '@/types'
 
 export interface PersonalRow {
@@ -51,6 +51,46 @@ export const personalAdmin = {
   create: (d: object) => api.post<PersonalRow>('/admin/personal', d).then(r => r.data),
   update: (id: number, d: object) => api.put<PersonalRow>(`/admin/personal/${id}`, d).then(r => r.data),
   toggle: (id: number) => api.patch<PersonalRow>(`/admin/personal/${id}/toggle`).then(r => r.data),
+}
+
+// ── Ciudadanos (Core) ────────────────────────────────────────────
+export interface CiudadanoRow {
+  id: number
+  codigo: string
+  tipo_identificacion_id: number
+  tipo_identificacion?: TipoIdentificacion
+  numero_identificacion: string
+  nombres: string
+  apellidos: string
+  telefono?: string
+  email?: string
+  direccion?: string
+  municipio?: string
+  activo: boolean
+}
+
+export const ciudadanosAdmin = {
+  list:   (p: object) => pg<CiudadanoRow>('/admin/ciudadanos', p),
+  create: (d: object) => api.post<CiudadanoRow>('/admin/ciudadanos', d).then(r => r.data),
+  update: (id: number, d: object) => api.put<CiudadanoRow>(`/admin/ciudadanos/${id}`, d).then(r => r.data),
+}
+
+// ── Empresas (Core) — solo crear + listar, el Core no expone editar ──
+export interface EmpresaRow {
+  id: number
+  codigo: string
+  nit: string
+  razon_social: string
+  direccion?: string
+  municipio?: string
+  telefono?: string
+  email?: string
+  activo: boolean
+}
+
+export const empresasAdmin = {
+  list:   (p: object) => pg<EmpresaRow>('/admin/empresas', p),
+  create: (d: object) => api.post<EmpresaRow>('/admin/empresas', d).then(r => r.data),
 }
 
 // ── Aux Tips ──────────────────────────────────────────────────────

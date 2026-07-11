@@ -12,6 +12,8 @@ use App\Http\Controllers\Api\Admin\DependenciaAdminController;
 use App\Http\Controllers\Api\Admin\TipoCorrespondenciaAdminController;
 use App\Http\Controllers\Api\Admin\UserAdminController;
 use App\Http\Controllers\Api\Admin\PersonalAdminController;
+use App\Http\Controllers\Api\Admin\CiudadanoAdminController;
+use App\Http\Controllers\Api\Admin\EmpresaAdminController;
 use App\Http\Controllers\Api\Admin\CatalogoAdminController;
 use Illuminate\Support\Facades\Route;
 
@@ -105,6 +107,15 @@ Route::prefix('v1')->group(function () {
             Route::post('personal',                     [PersonalAdminController::class, 'store']);
             Route::put('personal/{personal}',           [PersonalAdminController::class, 'update']);
             Route::patch('personal/{personal}/toggle',  [PersonalAdminController::class, 'toggleActivo']);
+
+            // Ciudadanos (Core) - soporta editar, el Core ya expone PUT ciudadanos/id
+            Route::get('ciudadanos',                     [CiudadanoAdminController::class, 'index']);
+            Route::post('ciudadanos',                    [CiudadanoAdminController::class, 'store']);
+            Route::put('ciudadanos/{ciudadano}',         [CiudadanoAdminController::class, 'update']);
+
+            // Empresas (Core) - solo crear y listar, el Core aun no expone PUT empresas/id
+            Route::get('empresas',                       [EmpresaAdminController::class, 'index']);
+            Route::post('empresas',                      [EmpresaAdminController::class, 'store']);
 
             // Catálogos simples
             Route::get('aux-tips',                    [CatalogoAdminController::class, 'auxTipsIndex']);

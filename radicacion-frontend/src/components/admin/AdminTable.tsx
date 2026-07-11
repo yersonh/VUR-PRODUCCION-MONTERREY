@@ -20,7 +20,7 @@ interface AdminTableProps<T extends { id: number }> {
   busqueda: string
   onBuscar: (q: string) => void
   onNuevo: () => void
-  onEditar: (fila: T) => void
+  onEditar?: (fila: T) => void
   onPagina: (p: number) => void
   labelNuevo?: string
   accionExtra?: (fila: T) => React.ReactNode
@@ -142,14 +142,16 @@ export function AdminTable<T extends { id: number }>({
                       <td className="px-4 py-2.5">
                         <div className="flex items-center justify-center gap-1.5">
                           {accionExtra?.(fila)}
-                          <button
-                            type="button"
-                            onClick={() => onEditar(fila)}
-                            title="Editar"
-                            className="p-1.5 text-[#2B5BA8] hover:bg-blue-50 rounded-lg transition-colors"
-                          >
-                            <PencilIcon className="w-3.5 h-3.5" />
-                          </button>
+                          {onEditar && (
+                            <button
+                              type="button"
+                              onClick={() => onEditar(fila)}
+                              title="Editar"
+                              className="p-1.5 text-[#2B5BA8] hover:bg-blue-50 rounded-lg transition-colors"
+                            >
+                              <PencilIcon className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
