@@ -53,7 +53,7 @@ The main domain entity is `Radicado` — a correspondence record with soft delet
 
 `Radicado` update uses `POST /radicados/{id}` instead of `PUT` because browsers can't send multipart/form-data via PUT — the controller handles this transparently.
 
-Expected `EstadoCorrespondencia` codes (seeded): `RADICADO`, `EN_TRAMITE`, `RESPONDIDO`, `CERRADO`, `ANULADO`. `RADICADO` is kept only for historical rows — new radicados are created directly in `EN_TRAMITE` (`RadicadoService::crear()` skips the `RADICADO` step). There is no manual "cambiar estado" UI; `RESPONDIDO` happens automatically when the response PDF is attached, and `ANULADO` is the only state reachable via a manual action (admin-only "Anular" button).
+Expected `EstadoCorrespondencia` codes (seeded): `RADICADO`, `EN_TRAMITE`, `RESPONDIDO`, `CERRADO`, `ANULADO`. `RADICADO` is always the initial status on creation. There is no manual "cambiar estado" UI; `RESPONDIDO` happens automatically when the response PDF is attached, and `ANULADO` is the only state reachable via a manual action (admin-only "Anular" button) — `EN_TRAMITE`/`CERRADO` currently have no path to be reached from the UI.
 
 Local catalogs (own tables, read-only in normal use): `TipoCorrespondencia`, `TipoAnexo`, `AuxTip` (optionally scoped to a `TipoCorrespondencia` via nullable `tipo_correspondencia_id`), `MedioIngreso`, `EstadoCorrespondencia`.
 

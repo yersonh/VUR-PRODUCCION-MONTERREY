@@ -70,9 +70,8 @@ class RadicadoService
                 ? $hoy->copy()->addWeekdays($tipoCorr->max_dias)->toDateString()
                 : null;
 
-            // Estado inicial: se salta 'RADICADO' y arranca directo en
-            // 'EN_TRAMITE' — ya no hay un paso manual para esa transición.
-            $estadoInicial = EstadoCorrespondencia::where('codigo', 'EN_TRAMITE')->firstOrFail();
+            // Estado inicial
+            $estadoInicial = EstadoCorrespondencia::where('codigo', 'RADICADO')->firstOrFail();
 
             $radicado = Radicado::create(array_merge($datos, [
                 'nro_radicado'    => $nro,
