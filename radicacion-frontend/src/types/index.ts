@@ -164,7 +164,7 @@ export interface Radicado {
   procedencia: 'EXTERNO' | 'INTERNO'
   fecha_radicacion: string
   hora_radicacion: string
-  tipo_remitente: 'FUNCIONARIO' | 'TERCERO_NIT'
+  tipo_remitente: 'FUNCIONARIO' | 'TERCERO_NIT' | 'CIUDADANO'
   funcionario?: FuncionarioResumen
   tercero?: TerceroResumen
   dependencia_remitente?: Dependencia

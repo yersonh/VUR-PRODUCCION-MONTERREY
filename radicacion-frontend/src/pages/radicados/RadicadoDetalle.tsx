@@ -457,7 +457,7 @@ export default function RadicadoDetalle() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                   <Campo
                     label="Tipo remitente"
-                    value={{ TERCERO_NIT: 'Tercero / NIT', FUNCIONARIO: 'Funcionario' }[radicado.tipo_remitente]}
+                    value={{ TERCERO_NIT: 'Tercero / NIT', FUNCIONARIO: 'Funcionario', CIUDADANO: 'Ciudadano' }[radicado.tipo_remitente]}
                   />
                   <Campo label="Remitente" value={nombreRemitente()} />
                   <Campo label="Dependencia remitente" value={radicado.dependencia_remitente?.descripcion} />
