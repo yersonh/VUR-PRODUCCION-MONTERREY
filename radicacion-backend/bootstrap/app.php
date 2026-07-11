@@ -21,7 +21,8 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Alias de middlewares personalizados
         $middleware->alias([
-            'admin' => \App\Http\Middleware\EnsureAdmin::class,
+            'admin'     => \App\Http\Middleware\EnsureAdmin::class,
+            'cdr.token' => \App\Http\Middleware\EnsureCdrServiceToken::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

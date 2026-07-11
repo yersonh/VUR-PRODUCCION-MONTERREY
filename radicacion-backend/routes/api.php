@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\PersonalController;
 use App\Http\Controllers\Api\RadicadoController;
 use App\Http\Controllers\Api\TerceroController;
 use App\Http\Controllers\Api\NotificacionController;
+use App\Http\Controllers\Api\SolicitudCartaResidenciaController;
 use App\Http\Controllers\Api\Admin\DependenciaAdminController;
 use App\Http\Controllers\Api\Admin\TipoCorrespondenciaAdminController;
 use App\Http\Controllers\Api\Admin\UserAdminController;
@@ -24,6 +25,12 @@ Route::prefix('v1')->group(function () {
     Route::prefix('auth')->group(function () {
         Route::post('login', [AuthController::class, 'login']);
     });
+
+    // Intake de CDR (Certificado de Residencia Digital) — sin sesión de
+    // usuario, autenticado con el token de servicio compartido (ver
+    // EnsureCdrServiceToken / ClienteCdr).
+    Route::post('solicitudes-carta-residencia', [SolicitudCartaResidenciaController::class, 'store'])
+        ->middleware('cdr.token');
 
     // ── Protegidas con Sanctum ───────────────────────────────────
     Route::middleware('auth:sanctum')->group(function () {

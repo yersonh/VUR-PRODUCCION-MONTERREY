@@ -13,6 +13,7 @@ export interface RadicadoFiltros {
   dependencia_destino_id?: number
   remitente?: string
   asignados_a_mi?: boolean
+  solo_cdr?: boolean
 }
 
 export interface RadicadoListItem {

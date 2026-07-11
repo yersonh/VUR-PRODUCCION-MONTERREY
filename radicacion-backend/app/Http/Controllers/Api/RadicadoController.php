@@ -75,6 +75,13 @@ class RadicadoController extends Controller
         ->when($request->filled('dependencia_destino_id'), fn ($q) =>
             $q->where('dependencia_destino_id', $request->integer('dependencia_destino_id'))
         )
+        // Tab "Solicitudes CDR": radicados creados por el intake público de
+        // CDR siempre quedan con operador_id = usuario de sistema (ver
+        // SolicitudCartaResidenciaController), así que ese id es un filtro
+        // exacto sin necesitar una columna de origen dedicada.
+        ->when($request->boolean('solo_cdr'), fn ($q) =>
+            $q->where('operador_id', User::where('email', config('services.cdr.operador_email'))->value('id') ?? 0)
+        )
         // 'asignados_a_mi': usado por la vista "Mis Radicados" del rol
         // FUNCIONARIO — mismo criterio que RadicadoService::puedeResponder().
         ->when($request->boolean('asignados_a_mi'), function ($q) use ($request) {

@@ -33,6 +33,11 @@ return [
         'url'                                 => env('CDR_API_URL'),
         'token'                               => env('CDR_API_TOKEN'),
         'tipo_correspondencia_residencia_id'  => env('VUR_TIPO_CORRESPONDENCIA_RESIDENCIA_ID', 90),
+        // Usuario "de sistema" que queda como operador_id de los radicados
+        // creados automáticamente por el intake público de CDR (ver
+        // SolicitudCartaResidenciaController). Sembrado en la migración
+        // 2026_07_11_120000_seed_cdr_sistema_user.php.
+        'operador_email'                      => env('CDR_OPERADOR_EMAIL', 'sistema.cdr@monterrey.gov.co'),
     ],
     // ── Brevo (correos transaccionales vía API REST) ───────────────
     'brevo' => [

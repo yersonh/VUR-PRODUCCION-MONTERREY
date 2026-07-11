@@ -13,6 +13,7 @@ import { es } from 'date-fns/locale'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { EstadoBadge } from '@/components/ui/EstadoBadge'
 import { useCatalogoStore } from '@/store/catalogoStore'
+import { useAuthStore } from '@/store/authStore'
 import { formatNumeroRadicado } from '@/lib/utils'
 import radicadoService, { type RadicadoListItem, type RadicadoFiltros } from '@/services/radicadoService'
 import type { EstadoRadicado } from '@/types'
@@ -28,6 +29,15 @@ const ESTADOS: { value: EstadoRadicado | ''; label: string }[] = [
 ]
 
 const PER_PAGE_OPTIONS = [10, 20, 50]
+
+const TABS: { value: 'todos' | 'cdr'; label: string }[] = [
+  { value: 'todos', label: 'Todos los radicados' },
+  { value: 'cdr',   label: 'Solicitudes CDR' },
+]
+
+// Cada cuánto se refresca el contador de solicitudes CDR pendientes (mismo
+// intervalo que la campanita de notificaciones, ver NotificacionesPanel).
+const POLL_INTERVAL_CDR = 30_000
 
 const FILTROS_INIT: RadicadoFiltros = {
   page: 1,
@@ -68,13 +78,22 @@ function ProcedenciaBadge({ valor }: { valor: 'EXTERNO' | 'INTERNO' }) {
 
 export default function RadicadoListado() {
   const { dependencias, tiposCorrespondencia } = useCatalogoStore()
+  const user = useAuthStore(s => s.user)
+  const esFuncionario = user?.role?.nombre === 'FUNCIONARIO'
 
-  const [filtros, setFiltros] = useState<RadicadoFiltros>(FILTROS_INIT)
-  const [filtrosAplicados, setFiltrosAplicados] = useState<RadicadoFiltros>(FILTROS_INIT)
+  // Un FUNCIONARIO solo ve lo que le corresponde responder — el filtro
+  // 'asignados_a_mi' queda forzado y no se le ofrece la opción de quitarlo.
+  const filtrosBase: RadicadoFiltros = esFuncionario
+    ? { ...FILTROS_INIT, asignados_a_mi: true }
+    : FILTROS_INIT
+
+  const [filtros, setFiltros] = useState<RadicadoFiltros>(filtrosBase)
+  const [filtrosAplicados, setFiltrosAplicados] = useState<RadicadoFiltros>(filtrosBase)
   const [mostrarFiltros, setMostrarFiltros] = useState(false)
   const [filas, setFilas] = useState<RadicadoListItem[]>([])
   const [meta, setMeta] = useState({ current_page: 1, last_page: 1, total: 0, per_page: 20 })
   const [cargando, setCargando] = useState(false)
+  const [cdrPendientes, setCdrPendientes] = useState(0)
 
   const cargar = useCallback(async (f: RadicadoFiltros) => {
     setCargando(true)
@@ -93,14 +112,29 @@ export default function RadicadoListado() {
     cargar(filtrosAplicados)
   }, [filtrosAplicados, cargar])
 
+  // Contador de solicitudes CDR aún no atendidas (estado inicial RADICADO),
+  // para el badge del tab "Solicitudes CDR" — independiente del tab activo.
+  useEffect(() => {
+    let cancelado = false
+    const fetchPendientes = async () => {
+      try {
+        const resp = await radicadoService.listar({ solo_cdr: true, estado: 'RADICADO', per_page: 1 })
+        if (!cancelado) setCdrPendientes(resp.meta?.total ?? 0)
+      } catch { /* silencioso */ }
+    }
+    fetchPendientes()
+    const id = setInterval(fetchPendientes, POLL_INTERVAL_CDR)
+    return () => { cancelado = true; clearInterval(id) }
+  }, [])
+
   const aplicarFiltros = () => {
     const nuevo = { ...filtros, page: 1 }
     setFiltrosAplicados(nuevo)
   }
 
   const limpiarFiltros = () => {
-    setFiltros(FILTROS_INIT)
-    setFiltrosAplicados(FILTROS_INIT)
+    setFiltros(filtrosBase)
+    setFiltrosAplicados(filtrosBase)
   }
 
   const cambiarPagina = (pagina: number) => {
@@ -116,6 +150,14 @@ export default function RadicadoListado() {
 
   const setFiltro = <K extends keyof RadicadoFiltros>(key: K, value: RadicadoFiltros[K]) => {
     setFiltros(prev => ({ ...prev, [key]: value }))
+  }
+
+  const tabActivo: 'todos' | 'cdr' = filtrosAplicados.solo_cdr ? 'cdr' : 'todos'
+
+  const cambiarTab = (tab: 'todos' | 'cdr') => {
+    const nuevo = { ...filtros, solo_cdr: tab === 'cdr' ? true : undefined, page: 1 }
+    setFiltros(nuevo)
+    setFiltrosAplicados(nuevo)
   }
 
   const hayFiltrosActivos = Boolean(
@@ -143,14 +185,14 @@ export default function RadicadoListado() {
   }
 
   return (
-    <AppLayout subtitle="Consultar Radicados">
+    <AppLayout subtitle={esFuncionario ? 'Mis Radicados' : 'Consultar Radicados'}>
       <div className="flex-1 p-4 md:p-6 space-y-4 max-w-screen-xl mx-auto w-full">
 
         {/* ── Encabezado ─────────────────────────────────────────── */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-xl font-bold text-[#1B3A6E]">Radicados</h1>
-            <p className="text-sm text-slate-500">
+            <h1 className="text-xl font-bold text-white">{esFuncionario ? 'Mis Radicados' : 'Radicados'}</h1>
+            <p className="text-sm text-slate-300">
               {cargando ? 'Cargando...' : `${(meta.total ?? 0).toLocaleString()} registro${(meta.total ?? 0) !== 1 ? 's' : ''} encontrado${(meta.total ?? 0) !== 1 ? 's' : ''}`}
             </p>
           </div>
@@ -160,7 +202,7 @@ export default function RadicadoListado() {
               onClick={() => cargar(filtrosAplicados)}
               disabled={cargando}
               title="Recargar"
-              className="p-2 border border-slate-300 rounded-xl text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50"
+              className="p-2 border border-white/20 rounded-xl text-slate-200 hover:bg-white/10 transition-colors disabled:opacity-50"
             >
               <ArrowPathIcon className={cn('w-4 h-4', cargando && 'animate-spin')} />
             </button>
@@ -170,25 +212,51 @@ export default function RadicadoListado() {
               className={cn(
                 'flex items-center gap-2 px-3 py-2 rounded-xl border text-sm font-medium transition-colors',
                 mostrarFiltros || hayFiltrosActivos
-                  ? 'bg-[#1B3A6E] text-white border-[#1B3A6E]'
-                  : 'border-slate-300 text-slate-600 hover:bg-slate-50',
+                  ? 'bg-[#C8A800] text-[#0B1220] border-[#C8A800]'
+                  : 'border-white/20 text-slate-200 hover:bg-white/10',
               )}
             >
               <FunnelIcon className="w-4 h-4" />
               Filtros
               {hayFiltrosActivos && (
-                <span className="w-4 h-4 rounded-full bg-[#C8A800] text-[#1B3A6E] text-[9px] font-bold flex items-center justify-center">
+                <span className="w-4 h-4 rounded-full bg-[#C8A800] text-[#0B1220] text-[9px] font-bold flex items-center justify-center">
                   •
                 </span>
               )}
             </button>
-            <Link
-              to="/radicados/nuevo"
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-semibold transition-colors"
-            >
-              <PlusIcon className="w-4 h-4" /> Nuevo Radicado
-            </Link>
+            {!esFuncionario && (
+              <Link
+                to="/radicados/nuevo"
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-semibold transition-colors"
+              >
+                <PlusIcon className="w-4 h-4" /> Nuevo Radicado
+              </Link>
+            )}
           </div>
+        </div>
+
+        {/* ── Tabs ────────────────────────────────────────────────── */}
+        <div className="flex items-center gap-1 border-b border-white/10">
+          {TABS.map(t => (
+            <button
+              key={t.value}
+              type="button"
+              onClick={() => cambiarTab(t.value)}
+              className={cn(
+                'flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
+                tabActivo === t.value
+                  ? 'border-[#C8A800] text-[#C8A800]'
+                  : 'border-transparent text-slate-300 hover:text-white',
+              )}
+            >
+              {t.label}
+              {t.value === 'cdr' && cdrPendientes > 0 && (
+                <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center leading-none">
+                  {cdrPendientes > 99 ? '99+' : cdrPendientes}
+                </span>
+              )}
+            </button>
+          ))}
         </div>
 
         {/* ── Barra de búsqueda rápida ───────────────────────────── */}
@@ -202,13 +270,13 @@ export default function RadicadoListado() {
               onKeyDown={e => e.key === 'Enter' && aplicarFiltros()}
               placeholder="Buscar por número (ej: 2026-000123)..."
               maxLength={15}
-              className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#2B5BA8]"
+              className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800]"
             />
           </div>
           <select
             value={filtros.estado ?? ''}
             onChange={e => { setFiltro('estado', e.target.value as EstadoRadicado | ''); aplicarFiltros() }}
-            className="px-3 py-2 border border-slate-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#2B5BA8]"
+            className="px-3 py-2 border border-slate-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800]"
           >
             {ESTADOS.map(e => (
               <option key={e.value} value={e.value}>{e.label}</option>
@@ -217,7 +285,7 @@ export default function RadicadoListado() {
           <button
             type="button"
             onClick={aplicarFiltros}
-            className="px-4 py-2 bg-[#2B5BA8] hover:bg-[#1B3A6E] text-white rounded-xl text-sm font-medium transition-colors"
+            className="px-4 py-2 bg-[#C8A800] hover:bg-[#0B1220] text-white rounded-xl text-sm font-medium transition-colors"
           >
             Buscar
           </button>
@@ -225,7 +293,7 @@ export default function RadicadoListado() {
 
         {/* ── Filtros avanzados ──────────────────────────────────── */}
         {mostrarFiltros && (
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+          <div className="bg-white/90 backdrop-blur-sm border border-slate-200 rounded-2xl p-4 shadow-sm">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <div className="flex flex-col gap-0.5">
                 <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wide">Fecha desde</span>
@@ -233,7 +301,7 @@ export default function RadicadoListado() {
                   type="date"
                   value={filtros.fecha_desde ?? ''}
                   onChange={e => setFiltro('fecha_desde', e.target.value)}
-                  className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#2B5BA8]"
+                  className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800]"
                 />
               </div>
               <div className="flex flex-col gap-0.5">
@@ -242,7 +310,7 @@ export default function RadicadoListado() {
                   type="date"
                   value={filtros.fecha_hasta ?? ''}
                   onChange={e => setFiltro('fecha_hasta', e.target.value)}
-                  className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#2B5BA8]"
+                  className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800]"
                 />
               </div>
               <div className="flex flex-col gap-0.5">
@@ -253,7 +321,7 @@ export default function RadicadoListado() {
                   onChange={e => setFiltro('remitente', e.target.value)}
                   placeholder="Nombre o NIT..."
                   maxLength={60}
-                  className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#2B5BA8]"
+                  className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800]"
                 />
               </div>
               <div className="flex flex-col gap-0.5">
@@ -261,7 +329,7 @@ export default function RadicadoListado() {
                 <select
                   value={filtros.tipo_correspondencia_id ?? ''}
                   onChange={e => setFiltro('tipo_correspondencia_id', e.target.value ? Number(e.target.value) : undefined)}
-                  className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#2B5BA8]"
+                  className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800]"
                 >
                   <option value="">Todos</option>
                   {tiposCorrespondencia.map(t => (
@@ -274,7 +342,7 @@ export default function RadicadoListado() {
                 <select
                   value={filtros.dependencia_destino_id ?? ''}
                   onChange={e => setFiltro('dependencia_destino_id', e.target.value ? Number(e.target.value) : undefined)}
-                  className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#2B5BA8]"
+                  className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800]"
                 >
                   <option value="">Todas</option>
                   {dependencias.map(d => (
@@ -288,7 +356,7 @@ export default function RadicadoListado() {
               <button
                 type="button"
                 onClick={aplicarFiltros}
-                className="px-4 py-2 bg-[#2B5BA8] hover:bg-[#1B3A6E] text-white rounded-lg text-sm font-medium transition-colors"
+                className="px-4 py-2 bg-[#C8A800] hover:bg-[#0B1220] text-white rounded-lg text-sm font-medium transition-colors"
               >
                 Aplicar filtros
               </button>
@@ -316,11 +384,11 @@ export default function RadicadoListado() {
         )}
 
         {/* ── Tabla ─────────────────────────────────────────────── */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="bg-white/90 backdrop-blur-sm rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-[#1B3A6E] text-white">
+                <tr className="bg-[#0B1220] text-white">
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide whitespace-nowrap">
                     Nro. Radicado
                   </th>
@@ -362,7 +430,7 @@ export default function RadicadoListado() {
                           <button
                             type="button"
                             onClick={limpiarFiltros}
-                            className="text-sm text-[#2B5BA8] hover:underline"
+                            className="text-sm text-[#C8A800] hover:underline"
                           >
                             Limpiar filtros
                           </button>
@@ -383,7 +451,7 @@ export default function RadicadoListado() {
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <ProcedenciaBadge valor={fila.procedencia} />
-                          <span className="font-mono font-bold text-[#1B3A6E] text-sm">
+                          <span className="font-mono font-bold text-[#0B1220] text-sm">
                             {formatNumeroRadicado(fila.nro_radicado, fila.año_radicado)}
                           </span>
                         </div>
@@ -461,7 +529,7 @@ export default function RadicadoListado() {
                       <td className="px-4 py-3 text-center">
                         <Link
                           to={`/radicados/${fila.id}`}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-[#2B5BA8] border border-[#2B5BA8]/30 rounded-lg hover:bg-[#2B5BA8] hover:text-white transition-colors"
+                          className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-[#C8A800] border border-[#C8A800]/30 rounded-lg hover:bg-[#C8A800] hover:text-white transition-colors"
                         >
                           Ver
                         </Link>
@@ -515,7 +583,7 @@ export default function RadicadoListado() {
                       className={cn(
                         'w-7 h-7 rounded-lg text-xs font-medium transition-colors',
                         p === meta.current_page
-                          ? 'bg-[#1B3A6E] text-white'
+                          ? 'bg-[#0B1220] text-white'
                           : 'border border-slate-300 text-slate-600 hover:bg-slate-100',
                       )}
                     >
