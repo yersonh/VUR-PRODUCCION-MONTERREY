@@ -47,7 +47,6 @@ export default function CiudadanosAdmin() {
   const { tiposIdentificacion } = useCatalogoStore()
   const [estado, setEstado] = useState<Estado>({ data: [], total: 0, pagina: 1, ultimaPagina: 1, cargando: true })
   const [busqueda, setBusqueda] = useState('')
-  const [editando, setEditando] = useState<CiudadanoRow | null>(null)
   const [modalAbierto, setModalAbierto] = useState(false)
   const [guardando, setGuardando] = useState(false)
 
@@ -72,38 +71,17 @@ export default function CiudadanosAdmin() {
   }, [busqueda, cargar])
 
   const abrirNuevo = () => {
-    setEditando(null)
     reset({ tipo_identificacion_id: undefined, numero_identificacion: '', nombres: '', apellidos: '', telefono: '', email: '', direccion: '', municipio: '' })
     setModalAbierto(true)
   }
 
-  const abrirEditar = (c: CiudadanoRow) => {
-    setEditando(c)
-    reset({
-      tipo_identificacion_id: c.tipo_identificacion_id,
-      numero_identificacion:  c.numero_identificacion,
-      nombres:                c.nombres,
-      apellidos:              c.apellidos,
-      telefono:               c.telefono ?? '',
-      email:                  c.email ?? '',
-      direccion:              c.direccion ?? '',
-      municipio:              c.municipio ?? '',
-    })
-    setModalAbierto(true)
-  }
-
-  const cerrar = () => { setModalAbierto(false); setEditando(null) }
+  const cerrar = () => setModalAbierto(false)
 
   const onSubmit = async (data: FormData) => {
     setGuardando(true)
     try {
-      if (editando) {
-        await ciudadanosAdmin.update(editando.id, data)
-        toast.success('Ciudadano actualizado')
-      } else {
-        await ciudadanosAdmin.create(data)
-        toast.success('Ciudadano creado')
-      }
+      await ciudadanosAdmin.create(data)
+      toast.success('Ciudadano creado')
       cerrar()
       cargar(estado.pagina, busqueda)
     } catch (err: unknown) {
@@ -156,7 +134,6 @@ export default function CiudadanosAdmin() {
           busqueda={busqueda}
           onBuscar={setBusqueda}
           onNuevo={abrirNuevo}
-          onEditar={abrirEditar}
           onPagina={p => cargar(p, busqueda)}
           labelNuevo="Nuevo Ciudadano"
         />
@@ -175,7 +152,7 @@ export default function CiudadanosAdmin() {
               className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden"
             >
               <div className="bg-[#0B1220] px-6 py-4 flex items-center justify-between">
-                <h3 className="text-white font-semibold">{editando ? 'Editar Ciudadano' : 'Nuevo Ciudadano'}</h3>
+                <h3 className="text-white font-semibold">Nuevo Ciudadano</h3>
                 <button type="button" onClick={cerrar} className="text-white/70 hover:text-white p-1 rounded-lg">
                   <XMarkIcon className="w-5 h-5" />
                 </button>

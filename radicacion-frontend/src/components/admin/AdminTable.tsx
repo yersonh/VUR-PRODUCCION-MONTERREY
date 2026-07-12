@@ -29,7 +29,7 @@ interface AdminTableProps<T extends { id: number }> {
 function SkeletonRow({ cols }: { cols: number }) {
   return (
     <tr className="border-b border-slate-100 animate-pulse">
-      {Array.from({ length: cols + 1 }).map((_, i) => (
+      {Array.from({ length: cols }).map((_, i) => (
         <td key={i} className="px-4 py-3">
           <div className="h-3.5 bg-slate-200 rounded w-full" />
         </td>
@@ -52,6 +52,8 @@ export function AdminTable<T extends { id: number }>({
       : <span className="text-red-500 font-medium text-xs">Inactivo</span>
     return String(val)
   }
+
+  const hayAcciones = Boolean(onEditar || accionExtra)
 
   return (
     <div className="space-y-4">
@@ -110,18 +112,20 @@ export function AdminTable<T extends { id: number }>({
                     {col.label}
                   </th>
                 ))}
-                <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide w-24">
-                  Acciones
-                </th>
+                {hayAcciones && (
+                  <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide w-24">
+                    Acciones
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody>
               {cargando
-                ? Array.from({ length: 6 }).map((_, i) => <SkeletonRow key={i} cols={columnas.length} />)
+                ? Array.from({ length: 6 }).map((_, i) => <SkeletonRow key={i} cols={columnas.length + (hayAcciones ? 1 : 0)} />)
                 : filas.length === 0
                   ? (
                     <tr>
-                      <td colSpan={columnas.length + 1} className="py-16 text-center text-slate-400 text-sm">
+                      <td colSpan={columnas.length + (hayAcciones ? 1 : 0)} className="py-16 text-center text-slate-400 text-sm">
                         No hay registros
                       </td>
                     </tr>
@@ -139,21 +143,23 @@ export function AdminTable<T extends { id: number }>({
                           {getCellValue(fila, col)}
                         </td>
                       ))}
-                      <td className="px-4 py-2.5">
-                        <div className="flex items-center justify-center gap-1.5">
-                          {accionExtra?.(fila)}
-                          {onEditar && (
-                            <button
-                              type="button"
-                              onClick={() => onEditar(fila)}
-                              title="Editar"
-                              className="p-1.5 text-[#2B5BA8] hover:bg-blue-50 rounded-lg transition-colors"
-                            >
-                              <PencilIcon className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </div>
-                      </td>
+                      {hayAcciones && (
+                        <td className="px-4 py-2.5">
+                          <div className="flex items-center justify-center gap-1.5">
+                            {accionExtra?.(fila)}
+                            {onEditar && (
+                              <button
+                                type="button"
+                                onClick={() => onEditar(fila)}
+                                title="Editar"
+                                className="p-1.5 text-[#2B5BA8] hover:bg-blue-50 rounded-lg transition-colors"
+                              >
+                                <PencilIcon className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   ))
               }
