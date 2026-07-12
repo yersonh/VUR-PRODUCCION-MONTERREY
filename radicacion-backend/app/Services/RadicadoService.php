@@ -186,6 +186,23 @@ class RadicadoService
             $this->notificacion->notificarCambioEstado($radicado, $usuarioId);
         }
 
+        // Avisar por correo al remitente — salvo RESPONDIDO, que ya tiene su
+        // propio correo más específico (ver adjuntarPdfSalida() ->
+        // notificarRespuestaDisponible()); duplicar aquí sería redundante.
+        if ($estadoNuevo->codigo !== 'RESPONDIDO') {
+            $emailRemitente = $this->emailRemitente($radicado);
+            if ($emailRemitente) {
+                $this->brevo->enviarCambioEstado(
+                    email:              $emailRemitente,
+                    nombre:             $this->nombreRemitente($radicado),
+                    numeroRadicado:     $radicado->numeroRadicado,
+                    estadoCodigo:       $estadoNuevo->codigo,
+                    estadoDescripcion:  $estadoNuevo->descripcion,
+                    observacion:        $observacion ?: null,
+                );
+            }
+        }
+
         return $radicado->fresh($this->relaciones());
     }
 
