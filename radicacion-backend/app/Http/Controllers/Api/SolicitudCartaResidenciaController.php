@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\MedioIngreso;
 use App\Models\Tercero;
 use App\Models\TipoCorrespondencia;
 use App\Models\User;
 use App\Services\ClienteCore;
+use App\Services\PdfStorageService;
 use App\Services\RadicadoService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -23,8 +25,9 @@ use Illuminate\Support\Facades\Log;
 class SolicitudCartaResidenciaController extends Controller
 {
     public function __construct(
-        private RadicadoService $service,
-        private ClienteCore     $core,
+        private RadicadoService   $service,
+        private ClienteCore       $core,
+        private PdfStorageService $pdfStorage,
     ) {}
 
     public function store(Request $request): JsonResponse
@@ -135,6 +138,18 @@ class SolicitudCartaResidenciaController extends Controller
             ];
         }
 
+        // Documento Físico: el "documento" es el certificado/solicitud que
+        // llega en pdf_solicitud (no los anexos). Es un trámite 100%
+        // electrónico e instantáneo, así que fecha_documento y fecha_entrega
+        // son el mismo día que la radicación. folios/folios_de se llenan
+        // ambos con el conteo de páginas del PDF (no hay concepto de entrega
+        // parcial acá, así que "de" es el mismo total).
+        $paginas = $this->pdfStorage->contarPaginas($request->file('pdf_solicitud')->getRealPath());
+        $medioIngresoWeb = MedioIngreso::where('descripcion', 'Web')->first();
+        if (!$medioIngresoWeb) {
+            Log::warning('solicitudes-carta-residencia: no existe un MedioIngreso con descripción "Web" — medio_ingreso_id quedará sin llenar.');
+        }
+
         $radicado = $this->service->crear(
             datos: [
                 'manejo'                  => 'RESOLUTIVO',
@@ -145,6 +160,11 @@ class SolicitudCartaResidenciaController extends Controller
                 'dependencia_destino_id'   => $tipoCorrespondencia->dependencia_destino_id,
                 'observaciones'            => $observaciones,
                 'anexos'                   => $anexos,
+                'folios'                   => $paginas,
+                'folios_de'                => $paginas,
+                'medio_ingreso_id'         => $medioIngresoWeb?->id,
+                'fecha_documento'          => now()->toDateString(),
+                'fecha_entrega'            => now()->toDateString(),
             ],
             operadorId: $operador->id,
             pdfEntrada: $request->file('pdf_solicitud'),

@@ -34,6 +34,31 @@ class NotificacionService
     }
 
     /**
+     * Notifica sobre una solicitud recibida del intake automático de CDR.
+     * A diferencia de notificarNuevoRadicado() (que solo avisa a la
+     * dependencia destino), aquí nadie la radicó a mano — así que se avisa
+     * también a quienes normalmente procesan/triage toda la correspondencia
+     * entrante (rol OPERADOR) y a ADMIN, para que no quede desapercibida.
+     */
+    public function notificarSolicitudCdr(Radicado $radicado, int $operadorId): void
+    {
+        $usuarios = User::whereHas('role', fn ($q) => $q->whereIn('nombre', ['OPERADOR', 'ADMIN']))
+            ->where('activo', true)
+            ->where('id', '!=', $operadorId)
+            ->get();
+
+        foreach ($usuarios as $usuario) {
+            Notificacion::create([
+                'user_id'     => $usuario->id,
+                'tipo'        => 'RADICADO_NUEVO',
+                'titulo'      => 'Nueva solicitud recibida de CDR',
+                'mensaje'     => "Llegó automáticamente la solicitud de Carta de Residencia {$radicado->numeroRadicado} desde CDR.",
+                'radicado_id' => $radicado->id,
+            ]);
+        }
+    }
+
+    /**
      * Notifica al operador del radicado cuando cambia de estado.
      */
     public function notificarCambioEstado(Radicado $radicado, int $ejecutorId): void

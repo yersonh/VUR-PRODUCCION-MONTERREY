@@ -44,3 +44,25 @@ export function parsePaginated<T>(raw: Record<string, unknown>): { data: T[]; me
     },
   }
 }
+
+// Abre un PDF de la API en una pestaña nueva. Un <a href> plano no sirve
+// aquí: el backend exige Bearer token (esta SPA no usa cookies de Sanctum)
+// y la ruta es relativa a VITE_API_URL, no al origen del frontend — un
+// <a>/window.open directo ni pega al backend correcto ni lleva el token.
+// Se abre la pestaña primero (sync, dentro del gesto del usuario) para que
+// el navegador no la bloquee como popup mientras se espera el fetch.
+export async function abrirPdfEnNuevaVentana(path: string): Promise<void> {
+  const ventana = window.open('', '_blank')
+  try {
+    const res = await api.get(path, { responseType: 'blob' })
+    const blobUrl = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))
+    if (ventana) {
+      ventana.location.href = blobUrl
+    } else {
+      window.open(blobUrl, '_blank')
+    }
+  } catch {
+    ventana?.close()
+    throw new Error('No se pudo abrir el PDF')
+  }
+}

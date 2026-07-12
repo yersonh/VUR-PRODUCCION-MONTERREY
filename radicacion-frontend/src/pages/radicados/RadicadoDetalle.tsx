@@ -15,6 +15,7 @@ import { EstadoBadge } from '@/components/ui/EstadoBadge'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { PDFUploader } from '@/components/ui/PDFUploader'
 import radicadoService from '@/services/radicadoService'
+import { abrirPdfEnNuevaVentana } from '@/services/api'
 import { formatNumeroRadicado, cn } from '@/lib/utils'
 import type { Radicado, EstadoRadicado, RadicadoActuacion } from '@/types'
 import { useAuthStore } from '@/store/authStore'
@@ -183,6 +184,14 @@ export default function RadicadoDetalle() {
       toast.error('Error al eliminar el anexo')
     } finally {
       setEliminandoAnexoId(null)
+    }
+  }
+
+  const verPdf = async (path: string) => {
+    try {
+      await abrirPdfEnNuevaVentana(path)
+    } catch {
+      toast.error('No se pudo abrir el PDF')
     }
   }
 
@@ -365,15 +374,14 @@ export default function RadicadoDetalle() {
                             )}
                           </div>
                           {item.documento_id && (
-                            <a
-                              href={`/api/v1/radicados/${radicado.id}/documentos/${item.documento_id}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                            <button
+                              type="button"
+                              onClick={() => verPdf(`/radicados/${radicado.id}/documentos/${item.documento_id}`)}
                               className="p-1 text-[#C8A800] hover:text-[#0B1220] transition-colors shrink-0"
-                              title="Descargar anexo"
+                              title="Ver anexo"
                             >
                               <DocumentArrowDownIcon className="w-4 h-4" />
-                            </a>
+                            </button>
                           )}
                           {item.documento_id && puedeEditarAnexos && (
                             <button
@@ -472,15 +480,14 @@ export default function RadicadoDetalle() {
                             })()}
                           </p>
                         </div>
-                        <a
-                          href={`/api/v1/radicados/${radicado.id}/pdf/entrada`}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                        <button
+                          type="button"
+                          onClick={() => verPdf(`/radicados/${radicado.id}/pdf/entrada`)}
                           className="p-1.5 text-green-600 hover:text-green-800 transition-colors"
-                          title="Descargar PDF entrada"
+                          title="Ver PDF entrada"
                         >
                           <DocumentArrowDownIcon className="w-4 h-4" />
-                        </a>
+                        </button>
                       </div>
                     ) : (
                       <div className="flex items-center gap-2 p-3 bg-slate-50 border border-dashed border-slate-300 rounded-xl text-slate-400 text-sm">
@@ -500,15 +507,14 @@ export default function RadicadoDetalle() {
                             {radicado.documentos?.find(d => d.tipo === 'SALIDA')?.nombre_original ?? 'respuesta.pdf'}
                           </p>
                         </div>
-                        <a
-                          href={`/api/v1/radicados/${radicado.id}/pdf/salida`}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                        <button
+                          type="button"
+                          onClick={() => verPdf(`/radicados/${radicado.id}/pdf/salida`)}
                           className="p-1.5 text-blue-600 hover:text-blue-800 transition-colors"
-                          title="Descargar PDF salida"
+                          title="Ver PDF salida"
                         >
                           <DocumentArrowDownIcon className="w-4 h-4" />
-                        </a>
+                        </button>
                       </div>
                     ) : estadoActual && !['CERRADO', 'ANULADO'].includes(estadoActual) && radicado.puede_responder ? (
                       <div className="space-y-2">

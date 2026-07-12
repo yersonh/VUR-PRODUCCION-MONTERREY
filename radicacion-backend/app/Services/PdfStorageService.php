@@ -3,7 +3,9 @@
 namespace App\Services;
 
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Smalot\PdfParser\Parser;
 
 class PdfStorageService
 {
@@ -43,5 +45,20 @@ class PdfStorageService
     public function contenido(string $ruta): string
     {
         return Storage::disk('local')->get($ruta) ?? '';
+    }
+
+    // Cuenta las páginas de un PDF a partir de su ruta absoluta en disco
+    // (ej. $file->getRealPath() de un UploadedFile, antes de guardarlo).
+    // Best-effort: un PDF corrupto o con estructura rara no debe tumbar la
+    // radicación, solo se deja el dato sin llenar.
+    public function contarPaginas(string $rutaAbsoluta): ?int
+    {
+        try {
+            $pdf = (new Parser())->parseFile($rutaAbsoluta);
+            return count($pdf->getPages());
+        } catch (\Throwable $e) {
+            Log::warning("No se pudo contar páginas del PDF ({$rutaAbsoluta}): {$e->getMessage()}");
+            return null;
+        }
     }
 }

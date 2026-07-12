@@ -119,6 +119,7 @@ class RadicadoService
             // dentro de EnviarSolicitudResidenciaACdr::handle()).
             if ((int) $radicado->tipo_correspondencia_id === (int) config('services.cdr.tipo_correspondencia_residencia_id')) {
                 EnviarSolicitudResidenciaACdr::dispatch($radicado->id)->afterCommit();
+                $this->notificacion->notificarSolicitudCdr($radicado, $operadorId);
             }
 
             // Notificar al responsable/dependencia destino (sistema interno)
