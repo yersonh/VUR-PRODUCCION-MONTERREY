@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\MedioIngreso;
+use App\Models\Radicado;
 use App\Models\Tercero;
 use App\Models\TipoCorrespondencia;
 use App\Models\User;
@@ -159,6 +160,7 @@ class SolicitudCartaResidenciaController extends Controller
                 'tipo_correspondencia_id'  => $tipoCorrespondencia->id,
                 'dependencia_destino_id'   => $tipoCorrespondencia->dependencia_destino_id,
                 'observaciones'            => $observaciones,
+                'referencia_cdr'           => (string) $data['referencia_cdr'],
                 'anexos'                   => $anexos,
                 'folios'                   => $paginas,
                 'folios_de'                => $paginas,
@@ -169,11 +171,75 @@ class SolicitudCartaResidenciaController extends Controller
             operadorId: $operador->id,
             pdfEntrada: $request->file('pdf_solicitud'),
             pdfSalida: null,
+            // Este intake ya trae todos los campos estructurados y validados
+            // del formulario de CDR — no hace falta que Gemini los "adivine"
+            // del PDF, así que nos ahorramos esa llamada a la API.
+            analizarIa: false,
         );
 
         return response()->json([
             'radicado_vur' => $radicado->numero_radicado,
         ], 201);
+    }
+
+    // ── PATCH /solicitudes-carta-residencia/{radicadoVur}/estado ──────
+    // CDR nos avisa que cambió el estado de un trámite que le enviamos (ver
+    // EnviarSolicitudResidenciaACdr). Solo acepta los 3 estados que CDR
+    // puede empujar desde su propio flujo — RADICADO es siempre el inicial
+    // y ANULADO queda reservado para la acción manual de un ADMIN (ver
+    // RadicadoController::anular), así que este endpoint no los expone.
+    private const ESTADOS_PERMITIDOS_CDR = ['EN_TRAMITE', 'RESPONDIDO', 'CERRADO'];
+
+    public function actualizarEstado(Request $request, string $radicadoVur): JsonResponse
+    {
+        $data = $request->validate([
+            'estado' => ['required', 'string', 'in:'.implode(',', self::ESTADOS_PERMITIDOS_CDR)],
+            // Cuando CDR pasa a RESPONDIDO, adjunta el PDF del certificado
+            // firmado como la respuesta a la entrada que nosotros mismos le
+            // radicamos — se guarda igual que cuando un operador de VUR
+            // adjunta la respuesta a mano (ver adjuntarPdfSalida()).
+            'documento_respuesta' => ['nullable', 'file', 'mimes:pdf', 'max:20480'],
+        ]);
+
+        [$año, $nro] = explode('-', $radicadoVur);
+
+        $radicado = Radicado::with('estado')
+            ->where('año_radicado', (int) $año)
+            ->where('nro_radicado', (int) $nro)
+            ->where('tipo_correspondencia_id', config('services.cdr.tipo_correspondencia_residencia_id'))
+            ->first();
+
+        if (!$radicado) {
+            return response()->json(['message' => "No existe un radicado de Carta de Residencia con número {$radicadoVur}."], 404);
+        }
+
+        if ($radicado->estado?->es_terminal) {
+            return response()->json(['message' => 'El radicado está en estado terminal y no puede modificarse.'], 422);
+        }
+
+        $operador = User::where('email', config('services.cdr.operador_email'))->first();
+        if (!$operador) {
+            Log::error('solicitudes-carta-residencia/estado: usuario de sistema CDR no existe. Ejecutar migraciones pendientes.');
+            return response()->json(['message' => 'El sistema VUR no tiene configurado el usuario de sistema para este intake.'], 500);
+        }
+
+        // adjuntarPdfSalida() ya hace todo lo que necesitamos para RESPONDIDO
+        // con documento: guarda el PDF como SALIDA, transiciona el estado y
+        // dispara sus propias notificaciones (más específicas que el aviso
+        // genérico de cambiarEstado()) — por eso no se llama a cambiarEstado()
+        // aparte en este caso, se duplicaría la notificación.
+        if ($data['estado'] === 'RESPONDIDO' && $request->hasFile('documento_respuesta')) {
+            $this->service->adjuntarPdfSalida($radicado, $request->file('documento_respuesta'), $operador->id);
+        } else {
+            $this->service->cambiarEstado(
+                radicado:     $radicado,
+                codigoEstado: $data['estado'],
+                observacion:  "Cambio de estado reportado por CDR.",
+                usuarioId:    $operador->id,
+            );
+        }
+
+        return response()->json(['message' => 'Estado actualizado correctamente.']);
     }
 
     // Divide "nombre_completo" en nombres/apellidos porque el Core exige
