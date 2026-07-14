@@ -5,6 +5,7 @@ namespace App\Services;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use setasign\Fpdi\Fpdi;
 use Smalot\PdfParser\Parser;
 
 class PdfStorageService
@@ -59,6 +60,56 @@ class PdfStorageService
         } catch (\Throwable $e) {
             Log::warning("No se pudo contar páginas del PDF ({$rutaAbsoluta}): {$e->getMessage()}");
             return null;
+        }
+    }
+
+    /**
+     * Estampa un QR en la esquina superior derecha de la PRIMERA página de un
+     * PDF (a partir de su ruta absoluta) y devuelve la ruta absoluta de un
+     * archivo temporal nuevo con el resultado — el original no se toca. El
+     * documento puede ser un escaneo (imagen sin texto real) o texto: a FPDI
+     * no le importa, importa la página como está y dibuja el QR encima, sin
+     * re-renderizar ni re-interpretar el contenido.
+     *
+     * El llamador es responsable de mover/guardar el archivo resultante y de
+     * borrar el temporal cuando termine.
+     */
+    public function estamparQr(string $rutaAbsolutaOriginal, string $qrPng): string
+    {
+        $qrTemp = tempnam(sys_get_temp_dir(), 'qr_').'.png';
+        file_put_contents($qrTemp, $qrPng);
+
+        try {
+            $pdf = new Fpdi();
+            $totalPaginas = $pdf->setSourceFile($rutaAbsolutaOriginal);
+
+            // 22mm de lado, 8mm de margen desde el borde — tamaño de sello
+            // que no debería tapar el contenido normal de una carta oficial
+            // en carta/A4.
+            $ladoQr = 22;
+            $margen = 8;
+
+            for ($pagina = 1; $pagina <= $totalPaginas; $pagina++) {
+                $idPlantilla = $pdf->importPage($pagina);
+                $tamano = $pdf->getTemplateSize($idPlantilla);
+
+                $pdf->AddPage($tamano['orientation'], [$tamano['width'], $tamano['height']]);
+                $pdf->useTemplate($idPlantilla);
+
+                // El QR solo va en la primera página — es la única que se
+                // verifica, no tiene sentido repetirlo en anexos de varias páginas.
+                if ($pagina === 1) {
+                    $x = $tamano['width'] - $ladoQr - $margen;
+                    $pdf->Image($qrTemp, $x, $margen, $ladoQr, $ladoQr, 'PNG');
+                }
+            }
+
+            $rutaSalida = tempnam(sys_get_temp_dir(), 'pdf_estampado_').'.pdf';
+            $pdf->Output('F', $rutaSalida);
+
+            return $rutaSalida;
+        } finally {
+            @unlink($qrTemp);
         }
     }
 }

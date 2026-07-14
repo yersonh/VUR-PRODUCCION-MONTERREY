@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class RadicadoDocumento extends Model
 {
     protected $fillable = [
-        'radicado_id', 'tipo', 'nombre_original',
+        'radicado_id', 'tipo', 'codigo_verificacion', 'nombre_original',
         'ruta_almacenamiento', 'tamanio_bytes', 'mime_type', 'subido_por',
     ];
 

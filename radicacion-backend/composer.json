@@ -8,11 +8,13 @@
     "require": {
         "php": "^8.3",
         "doctrine/dbal": "^4.4",
+        "endroid/qr-code": "^6.1",
         "guzzlehttp/guzzle": "^7.12",
         "laravel-lang/common": "^6.8",
         "laravel/framework": "^13.8",
         "laravel/sanctum": "^4.3",
         "laravel/tinker": "^3.0",
+        "setasign/fpdi-fpdf": "^2.3",
         "smalot/pdfparser": "^2.12",
         "spatie/laravel-permission": "^8.0"
     },

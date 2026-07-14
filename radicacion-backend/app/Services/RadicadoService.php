@@ -14,6 +14,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class RadicadoService
 {
@@ -23,6 +24,7 @@ class RadicadoService
         private BrevoMailService     $brevo,
         private NotificacionService  $notificacion,
         private ClienteCore          $core,
+        private QrService            $qr,
     ) {}
 
     /**
@@ -50,9 +52,9 @@ class RadicadoService
      * Crea un nuevo radicado con su PDF de entrada y opcionalmente PDF de salida.
      * Retorna el Radicado creado con todas sus relaciones cargadas.
      */
-    public function crear(array $datos, int $operadorId, ?UploadedFile $pdfEntrada, ?UploadedFile $pdfSalida): Radicado
+    public function crear(array $datos, int $operadorId, ?UploadedFile $pdfEntrada, ?UploadedFile $pdfSalida, bool $analizarIa = true): Radicado
     {
-        return DB::transaction(function () use ($datos, $operadorId, $pdfEntrada, $pdfSalida) {
+        return DB::transaction(function () use ($datos, $operadorId, $pdfEntrada, $pdfSalida, $analizarIa) {
             $nro  = $this->siguienteNumeroConLock();
             $año  = now()->year;
             $hoy  = Carbon::now();
@@ -104,8 +106,10 @@ class RadicadoService
                 'usuario_id'        => $operadorId,
             ]);
 
-            // Analizar PDF con IA si existe
-            if ($pdfEntrada) {
+            // Analizar PDF con IA si existe y el caller lo pidió (los intakes
+            // que ya traen todos los campos estructurados, como CDR, pasan
+            // analizarIa: false para no gastar la llamada a Gemini en vano).
+            if ($pdfEntrada && $analizarIa) {
                 $this->procesarIaAsync($radicado, $pdfEntrada);
             }
 
@@ -137,6 +141,7 @@ class RadicadoService
                     remitente:            $this->nombreRemitente($radicado),
                     tipoCorrespondencia:  $radicado->tipoCorrespondencia?->descripcion ?? '',
                     asunto:               $radicado->aux_descripcion ?? '',
+                    radicadoId:           $radicado->id,
                 );
             }
 
@@ -154,6 +159,7 @@ class RadicadoService
                     dependenciaDestino:     $this->dependenciaInfo($radicado->dependencia_destino_id)['descripcion'] ?? '',
                     fechaLimite:            $radicado->fecha_limite,
                     responsable:            $responsableInfo['nombre_completo'] ?? null,
+                    radicadoId:             $radicado->id,
                 );
             }
 
@@ -186,10 +192,14 @@ class RadicadoService
             $this->notificacion->notificarCambioEstado($radicado, $usuarioId);
         }
 
-        // Avisar por correo al remitente — salvo RESPONDIDO, que ya tiene su
-        // propio correo más específico (ver adjuntarPdfSalida() ->
-        // notificarRespuestaDisponible()); duplicar aquí sería redundante.
-        if ($estadoNuevo->codigo !== 'RESPONDIDO') {
+        // Avisar por correo al remitente — salvo cuando este cambio a
+        // RESPONDIDO viene de adjuntarPdfSalida() (identificado porque ese
+        // método pasa notificar:false), que ya dispara su propio correo más
+        // específico (ver notificarRespuestaDisponible()); duplicar aquí
+        // sería redundante. Si RESPONDIDO llega por otra vía (p. ej. el
+        // webhook de CDR en SolicitudCartaResidenciaController), sí hay que
+        // avisar aquí porque nadie más lo hace.
+        if (!($estadoNuevo->codigo === 'RESPONDIDO' && !$notificar)) {
             $emailRemitente = $this->emailRemitente($radicado);
             if ($emailRemitente) {
                 $this->brevo->enviarCambioEstado(
@@ -199,6 +209,7 @@ class RadicadoService
                     estadoCodigo:       $estadoNuevo->codigo,
                     estadoDescripcion:  $estadoNuevo->descripcion,
                     observacion:        $observacion ?: null,
+                    radicadoId:         $radicado->id,
                 );
             }
         }
@@ -251,16 +262,25 @@ class RadicadoService
                 nombre:          $radicado->operador->name,
                 numeroRadicado:  $radicado->numeroRadicado,
                 fechaRespuesta:  $fechaRespuesta,
+                radicadoId:      $radicado->id,
             );
         }
 
-        $emailRemitente = $this->emailRemitente($radicado);
+        // Al remitente no se le avisa cuando el radicado es una Solicitud de
+        // Carta de Residencia: ese trámite lo gestiona CDR de punta a punta y
+        // CDR ya le manda su propio correo al ciudadano al responder —
+        // duplicaríamos el aviso. Sí seguimos avisando al operador arriba,
+        // porque ese correo/notificación es interno de VUR.
+        $esResidenciaCdr = (int) $radicado->tipo_correspondencia_id === (int) config('services.cdr.tipo_correspondencia_residencia_id');
+
+        $emailRemitente = $esResidenciaCdr ? null : $this->emailRemitente($radicado);
         if ($emailRemitente) {
             $this->brevo->enviarRespuestaDisponible(
                 email:           $emailRemitente,
                 nombre:          $this->nombreRemitente($radicado),
                 numeroRadicado:  $radicado->numeroRadicado,
                 fechaRespuesta:  $fechaRespuesta,
+                radicadoId:      $radicado->id,
             );
         }
     }
@@ -359,17 +379,65 @@ class RadicadoService
 
     private function adjuntarPdf(Radicado $radicado, UploadedFile $file, string $tipo, int $subidoPor): RadicadoDocumento
     {
-        $ruta = $this->pdfStorage->guardar($file, $radicado->año_radicado, $radicado->nro_radicado, $tipo);
+        $codigoVerificacion = null;
+        $nombreOriginal = $file->getClientOriginalName();
+        $mimeType = $file->getMimeType() ?? 'application/pdf';
+
+        // Solo la respuesta (SALIDA) lleva QR — es la que se entrega al
+        // remitente y la que tiene sentido verificar públicamente. El
+        // documento puede llegar como escaneo (solo imagen) o con texto real;
+        // a FPDI no le importa, solo importa la página tal cual y dibuja el
+        // QR encima, sin volver a interpretar el contenido.
+        if ($tipo === 'SALIDA') {
+            $codigoVerificacion = $this->codigoVerificacionUnico();
+            $urlVerificacion = rtrim(env('FRONTEND_URL', 'http://localhost:5173'), '/')
+                ."/verificar-respuesta?codigo={$codigoVerificacion}";
+
+            $qrPng = $this->qr->png($urlVerificacion);
+            $rutaEstampada = $this->pdfStorage->estamparQr($file->getRealPath(), $qrPng);
+
+            try {
+                // A partir de aquí se guarda el PDF YA estampado, no el que
+                // llegó. El tamaño final hay que leerlo del estampado ANTES
+                // de borrar el temporal — el original ya no refleja el
+                // tamaño real que quedó en disco.
+                $archivoEstampado = new UploadedFile($rutaEstampada, $nombreOriginal, 'application/pdf', null, true);
+                $ruta = $this->pdfStorage->guardar($archivoEstampado, $radicado->año_radicado, $radicado->nro_radicado, $tipo);
+                $tamanioBytes = $archivoEstampado->getSize();
+                $mimeType = 'application/pdf';
+            } finally {
+                @unlink($rutaEstampada);
+            }
+        } else {
+            $ruta = $this->pdfStorage->guardar($file, $radicado->año_radicado, $radicado->nro_radicado, $tipo);
+            $tamanioBytes = $file->getSize();
+        }
 
         return RadicadoDocumento::create([
             'radicado_id'          => $radicado->id,
             'tipo'                 => $tipo,
-            'nombre_original'      => $file->getClientOriginalName(),
+            'codigo_verificacion'  => $codigoVerificacion,
+            'nombre_original'      => $nombreOriginal,
             'ruta_almacenamiento'  => $ruta,
-            'tamanio_bytes'        => $file->getSize(),
-            'mime_type'            => $file->getMimeType() ?? 'application/pdf',
+            'tamanio_bytes'        => $tamanioBytes,
+            'mime_type'            => $mimeType,
             'subido_por'           => $subidoPor,
         ]);
+    }
+
+    /**
+     * Código corto y aleatorio (no secuencial, para que no se pueda adivinar
+     * probando consecutivos) para la consulta pública del documento de
+     * respuesta — mismo patrón que usa CDR para el código de verificación
+     * de sus certificados.
+     */
+    private function codigoVerificacionUnico(): string
+    {
+        do {
+            $codigo = strtoupper(Str::random(4).'-'.Str::random(4));
+        } while (RadicadoDocumento::where('codigo_verificacion', $codigo)->exists());
+
+        return $codigo;
     }
 
     private function procesarIaAsync(Radicado $radicado, UploadedFile $pdfEntrada): void
