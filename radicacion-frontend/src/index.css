@@ -6,12 +6,12 @@
 ══════════════════════════════════════════════════════════════ */
 
 :root {
-  --color-primary:      #1B3A6E;
-  --color-primary-700:  #14306A;
-  --color-primary-500:  #2B5BA8;
-  --color-primary-100:  #DBEAFE;
+  --color-primary:      #0B1220;
+  --color-primary-700:  #060911;
+  --color-primary-500:  #C8A800;
+  --color-primary-100:  #1A2E28;
   --color-gold:         #C8A800;
-  --color-success:      #16A34A;
+  --color-success:      #1F8C6F;
   --color-danger:       #DC2626;
   --color-warning:      #F59E0B;
   --color-neutral-bg:   #F1F5F9;
@@ -28,7 +28,7 @@
 
 /* Focus ring institucional */
 *:focus-visible {
-  outline: 2px solid #2B5BA8;
+  outline: 2px solid #C8A800;
   outline-offset: 2px;
 }
 

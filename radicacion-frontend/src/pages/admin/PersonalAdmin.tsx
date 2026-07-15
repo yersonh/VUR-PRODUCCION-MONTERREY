@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import toast from 'react-hot-toast'
-import { XMarkIcon, PowerIcon } from '@heroicons/react/24/outline'
+import { XMarkIcon, PowerIcon, UserPlusIcon } from '@heroicons/react/24/outline'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { AdminTable } from '@/components/admin/AdminTable'
 import { personalAdmin, type PersonalRow } from '@/services/adminService'
@@ -44,6 +45,7 @@ const modalVariants = {
 }
 
 export default function PersonalAdmin() {
+  const navigate = useNavigate()
   const { dependencias } = useCatalogoStore()
   const [estado, setEstado] = useState<Estado>({ data: [], total: 0, pagina: 1, ultimaPagina: 1, cargando: true })
   const [busqueda, setBusqueda] = useState('')
@@ -125,6 +127,20 @@ export default function PersonalAdmin() {
     }
   }
 
+  const crearUsuarioDeAcceso = (p: PersonalRow) => {
+    navigate('/admin/usuarios', {
+      state: {
+        crearDesdeFuncionario: {
+          funcionario_id: p.id,
+          nombre: `${p.nombres} ${p.apellidos}`.trim(),
+          email: p.email ?? '',
+          dependencia_id: p.dependencia_id,
+          cargo: p.cargo ?? null,
+        },
+      },
+    })
+  }
+
   const columnas = [
     { key: 'id'        as const, label: '#',          width: '60px'  },
     { key: 'cedula'    as const, label: 'Cédula',    width: '110px' },
@@ -132,9 +148,22 @@ export default function PersonalAdmin() {
     { key: 'nombres'   as const, label: 'Nombres' },
     { key: 'cargo'     as const, label: 'Cargo' },
     {
+      key: 'email' as const,
+      label: 'Correo',
+      render: (p: PersonalRow) => <span className="text-xs text-slate-500">{p.email || '—'}</span>,
+    },
+    {
       key: 'dependencia' as const,
       label: 'Dependencia',
       render: (p: PersonalRow) => <span className="text-xs text-slate-500">{p.dependencia?.descripcion ?? '—'}</span>,
+    },
+    {
+      key: 'tiene_usuario' as const,
+      label: 'Usuario',
+      width: '110px',
+      render: (p: PersonalRow) => p.tiene_usuario
+        ? <span className="text-xs text-slate-400">Con acceso</span>
+        : <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200 font-medium">Sin cuenta</span>,
     },
     { key: 'activo' as const, label: 'Estado', width: '90px' },
   ]
@@ -144,7 +173,7 @@ export default function PersonalAdmin() {
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0, transition: { duration: 0.25, ease: 'easeOut' as const } }}
-        className="p-6 max-w-6xl mx-auto"
+        className="p-6 w-full"
       >
         <AdminTable
           titulo="Personal"
@@ -161,13 +190,24 @@ export default function PersonalAdmin() {
           onPagina={p => cargar(p, busqueda)}
           labelNuevo="Nuevo Personal"
           accionExtra={p => (
-            <button
-              type="button" onClick={() => toggle(p)}
-              title={p.activo ? 'Desactivar' : 'Activar'}
-              className={cn('p-1.5 rounded-lg transition-colors', p.activo ? 'text-red-500 hover:bg-red-50' : 'text-green-600 hover:bg-green-50')}
-            >
-              <PowerIcon className="w-3.5 h-3.5" />
-            </button>
+            <>
+              {!p.tiene_usuario && (
+                <button
+                  type="button" onClick={() => crearUsuarioDeAcceso(p)}
+                  title="Crear usuario de acceso"
+                  className="p-1.5 rounded-lg transition-colors text-indigo-600 hover:bg-indigo-50"
+                >
+                  <UserPlusIcon className="w-3.5 h-3.5" />
+                </button>
+              )}
+              <button
+                type="button" onClick={() => toggle(p)}
+                title={p.activo ? 'Desactivar' : 'Activar'}
+                className={cn('p-1.5 rounded-lg transition-colors', p.activo ? 'text-red-500 hover:bg-red-50' : 'text-green-600 hover:bg-green-50')}
+              >
+                <PowerIcon className="w-3.5 h-3.5" />
+              </button>
+            </>
           )}
         />
       </motion.div>
@@ -182,9 +222,9 @@ export default function PersonalAdmin() {
           >
             <motion.div
               variants={modalVariants} initial="initial" animate="animate" exit="exit"
-              className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden"
+              className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden"
             >
-              <div className="bg-[#1B3A6E] px-6 py-4 flex items-center justify-between">
+              <div className="bg-[#0B1220] px-6 py-4 flex items-center justify-between">
                 <h3 className="text-white font-semibold">{editando ? 'Editar Personal' : 'Nuevo Personal'}</h3>
                 <button type="button" onClick={cerrar} className="text-white/70 hover:text-white p-1 rounded-lg">
                   <XMarkIcon className="w-5 h-5" />
@@ -199,7 +239,7 @@ export default function PersonalAdmin() {
                     </label>
                     <input {...register('cedula')} maxLength={10} inputMode="numeric"
                       onInput={e => { (e.target as HTMLInputElement).value = (e.target as HTMLInputElement).value.replace(/\D/g, '') }}
-                      className={cn('w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#2B5BA8]', errors.cedula ? 'border-red-400' : 'border-slate-300')} />
+                      className={cn('w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800]', errors.cedula ? 'border-red-400' : 'border-slate-300')} />
                     {errors.cedula && <p className="text-xs text-red-500 mt-1">{errors.cedula.message}</p>}
                   </div>
 
@@ -208,7 +248,7 @@ export default function PersonalAdmin() {
                       Cargo
                     </label>
                     <input {...register('cargo')} maxLength={100}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#2B5BA8]" />
+                      className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800]" />
                   </div>
 
                   <div>
@@ -216,7 +256,7 @@ export default function PersonalAdmin() {
                       Nombres <span className="text-red-500">*</span>
                     </label>
                     <input {...register('nombres')} maxLength={80}
-                      className={cn('w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#2B5BA8]', errors.nombres ? 'border-red-400' : 'border-slate-300')} />
+                      className={cn('w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800]', errors.nombres ? 'border-red-400' : 'border-slate-300')} />
                     {errors.nombres && <p className="text-xs text-red-500 mt-1">{errors.nombres.message}</p>}
                   </div>
 
@@ -225,21 +265,21 @@ export default function PersonalAdmin() {
                       Apellidos <span className="text-red-500">*</span>
                     </label>
                     <input {...register('apellidos')} maxLength={80}
-                      className={cn('w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#2B5BA8]', errors.apellidos ? 'border-red-400' : 'border-slate-300')} />
+                      className={cn('w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800]', errors.apellidos ? 'border-red-400' : 'border-slate-300')} />
                     {errors.apellidos && <p className="text-xs text-red-500 mt-1">{errors.apellidos.message}</p>}
                   </div>
 
                   <div>
                     <label className="block text-xs font-semibold text-slate-600 mb-1">Email</label>
                     <input {...register('email')} type="email" maxLength={100}
-                      className={cn('w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#2B5BA8]', errors.email ? 'border-red-400' : 'border-slate-300')} />
+                      className={cn('w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800]', errors.email ? 'border-red-400' : 'border-slate-300')} />
                     {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email.message}</p>}
                   </div>
 
                   <div>
                     <label className="block text-xs font-semibold text-slate-600 mb-1">Teléfono</label>
                     <input {...register('telefono')} maxLength={20}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#2B5BA8]" />
+                      className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800]" />
                   </div>
 
                   <div className="col-span-2">
@@ -248,7 +288,7 @@ export default function PersonalAdmin() {
                     </label>
                     <select
                       {...register('dependencia_id', { valueAsNumber: true })}
-                      className={cn('w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#2B5BA8] bg-white', errors.dependencia_id ? 'border-red-400' : 'border-slate-300')}
+                      className={cn('w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800] bg-white', errors.dependencia_id ? 'border-red-400' : 'border-slate-300')}
                     >
                       <option value="">— Seleccione —</option>
                       {dependencias.map(d => <option key={d.id} value={d.id}>{d.descripcion}</option>)}
@@ -258,13 +298,13 @@ export default function PersonalAdmin() {
                 </div>
 
                 <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <input type="checkbox" {...register('activo')} className="w-4 h-4 accent-[#1B3A6E]" />
+                  <input type="checkbox" {...register('activo')} className="w-4 h-4 accent-[#0B1220]" />
                   <span className="text-sm text-slate-700">Activo</span>
                 </label>
 
                 <div className="flex justify-end gap-3 pt-2">
                   <button type="button" onClick={cerrar} className="px-4 py-2 border border-slate-300 text-slate-600 rounded-xl text-sm hover:bg-slate-50 transition-colors">Cancelar</button>
-                  <button type="submit" disabled={guardando} className="px-6 py-2 bg-[#1B3A6E] hover:bg-[#14306A] text-white rounded-xl text-sm font-semibold transition-colors disabled:opacity-60">
+                  <button type="submit" disabled={guardando} className="px-6 py-2 bg-[#0B1220] hover:bg-[#060911] text-white rounded-xl text-sm font-semibold transition-colors disabled:opacity-60">
                     {guardando ? 'Guardando...' : 'Guardar'}
                   </button>
                 </div>

@@ -143,7 +143,7 @@ export function IABanner({ campos, confianza, revisado, onRevisar, onDismiss, on
           <button
             type="button"
             onClick={onRevisar}
-            className="flex items-center gap-1.5 text-xs bg-[#1B3A6E] text-white px-3 py-1.5 rounded-lg hover:bg-[#14306A] transition-colors font-semibold"
+            className="flex items-center gap-1.5 text-xs bg-[#0B1220] text-white px-3 py-1.5 rounded-lg hover:bg-[#060911] transition-colors font-semibold"
           >
             <CheckCircleIcon className="w-3.5 h-3.5" />
             Confirmar revisión

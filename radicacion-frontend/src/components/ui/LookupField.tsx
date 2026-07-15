@@ -32,7 +32,7 @@ export function LookupField({
       <div className={cn(
         'flex items-center rounded-lg border transition-colors overflow-hidden',
         disabled ? 'bg-slate-50 border-slate-200' : 'bg-white border-slate-300',
-        error ? 'border-red-300' : 'focus-within:border-[#2B5BA8] focus-within:ring-2 focus-within:ring-blue-100',
+        error ? 'border-red-300' : 'focus-within:border-[#C8A800] focus-within:ring-2 focus-within:ring-blue-100',
       )}>
         <input
           type="text"
@@ -67,7 +67,7 @@ export function LookupField({
             'px-3 py-2 border-l transition-colors',
             disabled
               ? 'border-slate-200 text-slate-300 cursor-default'
-              : 'border-slate-200 text-[#2B5BA8] hover:bg-[#2B5BA8] hover:text-white',
+              : 'border-slate-200 text-[#C8A800] hover:bg-[#C8A800] hover:text-white',
           )}
         >
           <MagnifyingGlassIcon className="w-4 h-4" />

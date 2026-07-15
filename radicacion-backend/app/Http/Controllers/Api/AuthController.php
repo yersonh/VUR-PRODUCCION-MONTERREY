@@ -7,7 +7,11 @@ use App\Models\User;
 use App\Services\ClienteCore;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -62,6 +66,92 @@ class AuthController extends Controller
         return response()->json(['message' => 'Sesión cerrada']);
     }
 
+    public function cambiarPassword(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'password_actual' => ['required', 'string'],
+            'password_nueva'  => [
+                'required', 'string', 'confirmed', 'different:password_actual',
+                Password::min(8)->mixedCase()->numbers(),
+            ],
+        ], [
+            'password_nueva.different' => 'La nueva contraseña debe ser diferente a la actual.',
+        ]);
+
+        /** @var User $user */
+        $user = $request->user();
+
+        if (! Hash::check($data['password_actual'], $user->password)) {
+            throw ValidationException::withMessages([
+                'password_actual' => ['La contraseña actual no es correcta.'],
+            ]);
+        }
+
+        $user->update([
+            'password'               => Hash::make($data['password_nueva']),
+            'debe_cambiar_password'  => false,
+            'email_verified_at'      => now(),
+        ]);
+
+        return response()->json(['user' => $this->formatUser($user->load('role'))]);
+    }
+
+    public function subirFoto(Request $request): JsonResponse
+    {
+        $request->validate([
+            'foto' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+        ]);
+
+        /** @var User $user */
+        $user = $request->user();
+
+        $this->eliminarArchivoFoto($user);
+
+        $extension = $request->file('foto')->extension();
+        $ruta = $request->file('foto')->storeAs(
+            'fotos_perfil',
+            "{$user->id}_" . time() . ".{$extension}",
+            'local',
+        );
+
+        $user->foto_path = $ruta;
+        $user->save();
+
+        return response()->json(['user' => $this->formatUser($user->load('role'))]);
+    }
+
+    public function eliminarFoto(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $this->eliminarArchivoFoto($user);
+        $user->foto_path = null;
+        $user->save();
+
+        return response()->json(['user' => $this->formatUser($user->load('role'))]);
+    }
+
+    public function foto(Request $request): Response|JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        if (!$user->foto_path || !Storage::disk('local')->exists($user->foto_path)) {
+            return response()->json(['message' => 'No hay foto de perfil'], 404);
+        }
+
+        return response(Storage::disk('local')->get($user->foto_path))
+            ->header('Content-Type', Storage::disk('local')->mimeType($user->foto_path));
+    }
+
+    private function eliminarArchivoFoto(User $user): void
+    {
+        if ($user->foto_path && Storage::disk('local')->exists($user->foto_path)) {
+            Storage::disk('local')->delete($user->foto_path);
+        }
+    }
+
     private function formatUser(User $user): array
     {
         return [
@@ -74,6 +164,8 @@ class AuthController extends Controller
                 'descripcion' => $user->role->descripcion,
             ] : null,
             'dependencia'     => $this->dependenciaInfo($user->dependencia_id),
+            'tiene_foto'      => (bool) $user->foto_path,
+            'debe_cambiar_password' => $user->debe_cambiar_password,
         ];
     }
 

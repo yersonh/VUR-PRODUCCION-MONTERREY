@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use App\Services\ClienteCore;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -28,7 +29,10 @@ class PersonalAdminController extends Controller
             'per_page' => $request->integer('per_page', 20),
         ]);
 
-        $data = collect($resultado['data'] ?? [])->map(fn (array $f) => $this->aFila($f));
+        $idsPagina = collect($resultado['data'] ?? [])->pluck('id')->all();
+        $idsConUsuario = User::whereIn('funcionario_id', $idsPagina)->pluck('funcionario_id')->all();
+
+        $data = collect($resultado['data'] ?? [])->map(fn (array $f) => $this->aFila($f, in_array($f['id'], $idsConUsuario)));
 
         // NOTA: GET /funcionarios del Core solo documenta el filtro 'persona_id'.
         // No hay búsqueda por texto (q) ni filtro por dependencia_id soportados
@@ -138,7 +142,7 @@ class PersonalAdminController extends Controller
         ], 501);
     }
 
-    private function aFila(array $funcionario): array
+    private function aFila(array $funcionario, bool $tieneUsuario = false): array
     {
         $persona     = $funcionario['persona'] ?? [];
         $dependencia = $funcionario['dependencia'] ?? null;
@@ -158,7 +162,8 @@ class PersonalAdminController extends Controller
                 'descripcion' => $dependencia['nombre'],
                 'activo'      => $dependencia['activo'] ?? true,
             ] : null,
-            'activo' => $funcionario['activo'] ?? true,
+            'activo'         => $funcionario['activo'] ?? true,
+            'tiene_usuario'  => $tieneUsuario,
         ];
     }
 }

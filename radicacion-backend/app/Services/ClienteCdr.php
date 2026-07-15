@@ -32,7 +32,13 @@ class ClienteCdr
             ->post("{$this->baseUrl}/v1/recibidos-vur", $datos);
 
         if ($response->status() === 409) {
-            Log::info('CDR ya tenía registrado este radicado_vur, se omite reenvío', [
+            // WARNING (no INFO): esto no es un reintento inofensivo del Job —
+            // es la primera vez que VUR manda este radicado_vur y CDR ya dice
+            // tenerlo, lo cual normalmente delata un choque de numeración
+            // entre los dos sistemas. Se trata como éxito idempotente para no
+            // romper la respuesta al usuario, pero el caller debe avisar a
+            // un humano (ver EnviarSolicitudResidenciaACdr).
+            Log::warning('CDR ya tenía registrado este radicado_vur, se omite reenvío — posible choque de numeración, revisar del lado de CDR', [
                 'radicado_vur' => $datos['radicado_vur'] ?? null,
             ]);
 

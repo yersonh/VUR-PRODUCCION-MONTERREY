@@ -213,7 +213,7 @@ export default function RadicadoDetalle() {
   }
 
   const estadoActual = radicado?.estado?.codigo as EstadoRadicado | undefined
-  const puedeAnular = esAdmin && estadoActual && !['CERRADO', 'ANULADO'].includes(estadoActual)
+  const puedeAnular = esAdmin && estadoActual && !['RESPONDIDO', 'CERRADO', 'ANULADO'].includes(estadoActual)
   const puedeEditarAnexos = estadoActual && !['CERRADO', 'ANULADO'].includes(estadoActual)
   const tienePdfEntrada = (radicado?.documentos ?? []).some(d => d.tipo === 'ENTRADA')
   const tienePdfSalida = (radicado?.documentos ?? []).some(d => d.tipo === 'SALIDA')

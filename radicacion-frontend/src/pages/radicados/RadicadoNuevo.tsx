@@ -15,6 +15,7 @@ import { CharCountInput } from '@/components/ui/CharCountInput'
 import { CharCountTextarea } from '@/components/ui/CharCountTextarea'
 import { PDFUploader } from '@/components/ui/PDFUploader'
 import { IABanner, type CampoAplicado } from '@/components/ui/IABanner'
+import { PlazoTimeline } from '@/components/ui/PlazoTimeline'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { EstadoBadge } from '@/components/ui/EstadoBadge'
 import { useRadicadoForm } from '@/hooks/useRadicadoForm'
@@ -96,7 +97,6 @@ export default function RadicadoNuevo() {
   const {
     form, añoRadicado, fechaRadicacion, horaRadicacion,
     display, setDisplayField,
-    calcularFechaLimite,
     limpiarRemitente, limpiarTipoCorr, limpiarAuxTip, limpiarDestino,
     tieneAnexos, setTieneAnexos,
     pdfEntrada, setPdfEntrada,
@@ -250,6 +250,9 @@ export default function RadicadoNuevo() {
 
   const watchTipoRemitente = watch('tipo_remitente')
   const watchTipoCorrespondenciaId = watch('tipo_correspondencia_id')
+  const watchFechaDocumento = watch('fecha_documento')
+  const watchFechaEntrega = watch('fecha_entrega')
+  const diasHabilesPlazo = tiposCorrespondencia.find(t => t.id === watchTipoCorrespondenciaId)?.max_dias ?? null
 
   // Dependencia destino editable: si la IA ya la detectó, o si el tipo de
   // correspondencia elegido no tiene una dependencia por defecto configurada.
@@ -344,7 +347,6 @@ export default function RadicadoNuevo() {
     setDisplayField({
       descripcionTipoCorr: String(row.descripcion ?? ''),
       maxDias: dias === 0 ? 'Sin límite' : String(dias),
-      fechaLimite: calcularFechaLimite(dias),
     })
     // Limpiar AuxTip al cambiar tipo de correspondencia (el filtrado cambia)
     limpiarAuxTip()
@@ -1150,7 +1152,6 @@ export default function RadicadoNuevo() {
                   className="lg:col-span-2"
                 />
                 <ReadonlyField label="Días hábiles" value={display.maxDias} />
-                <ReadonlyField label="Fecha límite" value={display.fechaLimite} />
               </div>
             </div>
 
@@ -1490,6 +1491,15 @@ export default function RadicadoNuevo() {
               />
             </div>
 
+          </div>
+
+          {/* ── Línea de tiempo del plazo ─────────────────────────── */}
+          <div className="mt-4 mb-4">
+            <PlazoTimeline
+              fechaDocumento={watchFechaDocumento}
+              fechaIngreso={watchFechaEntrega}
+              diasHabiles={diasHabilesPlazo}
+            />
           </div>
 
           {/* ── Barra de estado / acciones ─────────────────────────── */}

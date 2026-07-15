@@ -41,11 +41,11 @@ export function ConfirmDialog({
             exit="exit"
             role="alertdialog"
             aria-modal="true"
-            className="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden"
+            className="relative w-full max-w-sm bg-white/90 backdrop-blur-sm rounded-2xl shadow-2xl overflow-hidden"
           >
             <div className="flex flex-col items-center px-8 pt-8 pb-6 gap-4">
               <div className="w-14 h-14 rounded-full bg-blue-50 flex items-center justify-center">
-                <ExclamationCircleIcon className="w-8 h-8 text-[#2B5BA8]" />
+                <ExclamationCircleIcon className="w-8 h-8 text-[#C8A800]" />
               </div>
 
               <div className="text-center">

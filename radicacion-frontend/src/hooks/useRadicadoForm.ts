@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { format, addDays } from 'date-fns'
+import { format } from 'date-fns'
 import type { IACamposSugeridos } from '@/types'
 
 // ── Schema de validación ──────────────────────────────────────────
@@ -47,7 +47,6 @@ export interface DisplayState {
   descripcionDepRemitente: string
   descripcionTipoCorr: string
   maxDias: string
-  fechaLimite: string
   descripcionAuxTip: string
   descripcionDepDestino: string
   responsable: string
@@ -60,7 +59,6 @@ const DISPLAY_INIT: DisplayState = {
   descripcionDepRemitente: '',
   descripcionTipoCorr:     '',
   maxDias:                 '',
-  fechaLimite:             '',
   descripcionAuxTip:       '',
   descripcionDepDestino:   '',
   responsable:             '',
@@ -117,12 +115,6 @@ export function useRadicadoForm() {
   const setDisplayField = (field: Partial<DisplayState>) =>
     setDisplay(prev => ({ ...prev, ...field }))
 
-  // ── Calcular fecha límite al seleccionar tipo correspondencia ──
-  const calcularFechaLimite = (maxDias: number): string => {
-    if (maxDias === 0) return 'Sin límite'
-    return format(addDays(new Date(), maxDias), 'dd/MM/yyyy')
-  }
-
   // ── Limpiar remitente ──────────────────────────────────────────
   const limpiarRemitente = () => {
     form.setValue('tercero_id', null)
@@ -135,7 +127,7 @@ export function useRadicadoForm() {
   // ── Limpiar tipo correspondencia ───────────────────────────────
   const limpiarTipoCorr = () => {
     form.setValue('tipo_correspondencia_id', 0)
-    setDisplayField({ descripcionTipoCorr: '', maxDias: '', fechaLimite: '' })
+    setDisplayField({ descripcionTipoCorr: '', maxDias: '' })
   }
 
   // ── Limpiar aux tip ────────────────────────────────────────────
@@ -168,7 +160,6 @@ export function useRadicadoForm() {
     horaRadicacion,
     display,
     setDisplayField,
-    calcularFechaLimite,
     limpiarRemitente,
     limpiarTipoCorr,
     limpiarAuxTip,

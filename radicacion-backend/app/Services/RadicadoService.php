@@ -275,12 +275,16 @@ class RadicadoService
 
         $emailRemitente = $esResidenciaCdr ? null : $this->emailRemitente($radicado);
         if ($emailRemitente) {
+            $pdfSalida = $radicado->documentos->firstWhere('tipo', 'SALIDA');
+
             $this->brevo->enviarRespuestaDisponible(
-                email:           $emailRemitente,
-                nombre:          $this->nombreRemitente($radicado),
-                numeroRadicado:  $radicado->numeroRadicado,
-                fechaRespuesta:  $fechaRespuesta,
-                radicadoId:      $radicado->id,
+                email:            $emailRemitente,
+                nombre:           $this->nombreRemitente($radicado),
+                numeroRadicado:   $radicado->numeroRadicado,
+                fechaRespuesta:   $fechaRespuesta,
+                radicadoId:       $radicado->id,
+                pdfContenido:     $pdfSalida ? $this->pdfStorage->contenido($pdfSalida->ruta_almacenamiento) : null,
+                pdfNombreArchivo: "Radicado-{$radicado->numeroRadicado}-respuesta.pdf",
             );
         }
     }

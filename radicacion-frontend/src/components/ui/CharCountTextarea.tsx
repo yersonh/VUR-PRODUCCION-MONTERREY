@@ -27,7 +27,7 @@ export const CharCountTextarea = forwardRef<HTMLTextAreaElement, CharCountTextar
           className={cn(
             'w-full px-3 py-2 text-sm rounded-lg border resize-none transition-colors',
             'bg-white text-slate-800 placeholder:text-slate-400',
-            'focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#2B5BA8]',
+            'focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800]',
             error ? 'border-red-300' : 'border-slate-300',
             className
           )}

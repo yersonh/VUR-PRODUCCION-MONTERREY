@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -21,9 +22,15 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Alias de middlewares personalizados
         $middleware->alias([
-            'admin'     => \App\Http\Middleware\EnsureAdmin::class,
-            'cdr.token' => \App\Http\Middleware\EnsureCdrServiceToken::class,
+            'admin'       => \App\Http\Middleware\EnsureAdmin::class,
+            'password.ok' => \App\Http\Middleware\EnsureNoDebePasswordChange::class,
+            'cdr.token'   => \App\Http\Middleware\EnsureCdrServiceToken::class,
         ]);
+    })
+    ->withSchedule(function (Schedule $schedule): void {
+        // Requiere que `php artisan schedule:work` (dev) o un cron real
+        // (`* * * * * php artisan schedule:run`, producción) esté corriendo.
+        $schedule->command('radicados:notificar-vencimientos')->dailyAt('07:00');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

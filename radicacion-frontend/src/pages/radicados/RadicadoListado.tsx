@@ -115,6 +115,7 @@ export default function RadicadoListado() {
   // Contador de solicitudes CDR aún no atendidas (estado inicial RADICADO),
   // para el badge del tab "Solicitudes CDR" — independiente del tab activo.
   useEffect(() => {
+    if (esFuncionario) return
     let cancelado = false
     const fetchPendientes = async () => {
       try {
@@ -125,7 +126,7 @@ export default function RadicadoListado() {
     fetchPendientes()
     const id = setInterval(fetchPendientes, POLL_INTERVAL_CDR)
     return () => { cancelado = true; clearInterval(id) }
-  }, [])
+  }, [esFuncionario])
 
   const aplicarFiltros = () => {
     const nuevo = { ...filtros, page: 1 }
@@ -236,28 +237,30 @@ export default function RadicadoListado() {
         </div>
 
         {/* ── Tabs ────────────────────────────────────────────────── */}
-        <div className="flex items-center gap-1 border-b border-white/10">
-          {TABS.map(t => (
-            <button
-              key={t.value}
-              type="button"
-              onClick={() => cambiarTab(t.value)}
-              className={cn(
-                'flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
-                tabActivo === t.value
-                  ? 'border-[#C8A800] text-[#C8A800]'
-                  : 'border-transparent text-slate-300 hover:text-white',
-              )}
-            >
-              {t.label}
-              {t.value === 'cdr' && cdrPendientes > 0 && (
-                <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center leading-none">
-                  {cdrPendientes > 99 ? '99+' : cdrPendientes}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
+        {!esFuncionario && (
+          <div className="flex items-center gap-1 border-b border-white/10">
+            {TABS.map(t => (
+              <button
+                key={t.value}
+                type="button"
+                onClick={() => cambiarTab(t.value)}
+                className={cn(
+                  'flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
+                  tabActivo === t.value
+                    ? 'border-[#C8A800] text-[#C8A800]'
+                    : 'border-transparent text-slate-300 hover:text-white',
+                )}
+              >
+                {t.label}
+                {t.value === 'cdr' && cdrPendientes > 0 && (
+                  <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center leading-none">
+                    {cdrPendientes > 99 ? '99+' : cdrPendientes}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* ── Barra de búsqueda rápida ───────────────────────────── */}
         <div className="flex gap-2">

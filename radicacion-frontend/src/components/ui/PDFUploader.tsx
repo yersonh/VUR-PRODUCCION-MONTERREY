@@ -101,8 +101,8 @@ export function PDFUploader({
             disabled
               ? 'border-slate-200 bg-slate-50 cursor-default'
               : isDragging
-                ? 'border-[#2B5BA8] bg-blue-50'
-                : 'border-slate-300 bg-white hover:border-[#2B5BA8] hover:bg-blue-50/50',
+                ? 'border-[#C8A800] bg-blue-50'
+                : 'border-slate-300 bg-white hover:border-[#C8A800] hover:bg-blue-50/50',
           )}
         >
           <DocumentArrowUpIcon className={cn('w-8 h-8', disabled ? 'text-slate-300' : 'text-slate-400')} />

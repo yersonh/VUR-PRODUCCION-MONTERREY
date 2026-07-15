@@ -132,7 +132,7 @@ export default function DependenciasAdmin() {
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0, transition: { duration: 0.25, ease: 'easeOut' as const } }}
-        className="p-6 max-w-5xl mx-auto"
+        className="p-6 w-full"
       >
         <AdminTable
           titulo="Dependencias"
@@ -179,9 +179,9 @@ export default function DependenciasAdmin() {
             <motion.div
               variants={modalVariants}
               initial="initial" animate="animate" exit="exit"
-              className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+              className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
             >
-              <div className="bg-[#1B3A6E] px-6 py-4 flex items-center justify-between">
+              <div className="bg-[#0B1220] px-6 py-4 flex items-center justify-between">
                 <h3 className="text-white font-semibold">
                   {editando ? 'Editar Dependencia' : 'Nueva Dependencia'}
                 </h3>
@@ -205,7 +205,7 @@ export default function DependenciasAdmin() {
                     maxLength={120}
                     placeholder="Nombre completo de la dependencia"
                     className={cn(
-                      'w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#2B5BA8]',
+                      'w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800]',
                       errors.descripcion ? 'border-red-400' : 'border-slate-300',
                     )}
                   />
@@ -213,7 +213,7 @@ export default function DependenciasAdmin() {
                 </div>
 
                 <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <input type="checkbox" {...register('activo')} className="w-4 h-4 accent-[#1B3A6E]" />
+                  <input type="checkbox" {...register('activo')} className="w-4 h-4 accent-[#0B1220]" />
                   <span className="text-sm text-slate-700">Activa</span>
                 </label>
 
@@ -228,7 +228,7 @@ export default function DependenciasAdmin() {
                   <button
                     type="submit"
                     disabled={guardando}
-                    className="px-6 py-2 bg-[#1B3A6E] hover:bg-[#14306A] text-white rounded-xl text-sm font-semibold transition-colors disabled:opacity-60"
+                    className="px-6 py-2 bg-[#0B1220] hover:bg-[#060911] text-white rounded-xl text-sm font-semibold transition-colors disabled:opacity-60"
                   >
                     {guardando ? 'Guardando...' : 'Guardar'}
                   </button>

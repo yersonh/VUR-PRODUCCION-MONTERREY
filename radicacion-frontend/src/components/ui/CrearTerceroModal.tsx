@@ -181,10 +181,10 @@ export function CrearTerceroModal({ open, onClose, onCreado, defaultValues }: Pr
             role="dialog"
             aria-modal="true"
             aria-label="Crear Tercero"
-            className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+            className="relative w-full max-w-2xl bg-white/90 backdrop-blur-sm rounded-2xl shadow-2xl overflow-hidden flex flex-col"
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4 bg-[#1B3A6E]">
+            <div className="flex items-center justify-between px-5 py-4 bg-[#0B1220]">
               <div className="flex items-center gap-2">
                 {esNIT
                   ? <BuildingOfficeIcon className="w-4 h-4 text-white/70" />
@@ -214,7 +214,7 @@ export function CrearTerceroModal({ open, onClose, onCreado, defaultValues }: Pr
                     autoFocus
                     aria-invalid={!!errors.tipo_identificacion_id}
                     className={cn(
-                      'px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#2B5BA8]',
+                      'px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800]',
                       errors.tipo_identificacion_id ? 'border-red-300' : 'border-slate-300',
                     )}
                   >
@@ -252,7 +252,7 @@ export function CrearTerceroModal({ open, onClose, onCreado, defaultValues }: Pr
 
                   {/* Separador responsable */}
                   <div className="flex items-center gap-3 pt-1">
-                    <span className="text-[10px] font-bold text-[#1B3A6E] uppercase tracking-widest whitespace-nowrap">
+                    <span className="text-[10px] font-bold text-[#0B1220] uppercase tracking-widest whitespace-nowrap">
                       Contacto / Responsable
                     </span>
                     <div className="flex-1 h-px bg-slate-200" />

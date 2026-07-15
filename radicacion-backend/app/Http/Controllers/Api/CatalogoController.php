@@ -38,7 +38,14 @@ class CatalogoController extends Controller
 
     public function tiposCorrespondencia(): JsonResponse
     {
-        $data = TipoCorrespondencia::activo()->orderBy('descripcion')->get();
+        $dependencias = collect($this->core->dependencias())->keyBy('id');
+
+        $data = TipoCorrespondencia::activo()->orderBy('descripcion')->get()
+            ->map(fn (TipoCorrespondencia $tc) => [
+                ...$tc->toArray(),
+                'dependencia_destino_descripcion' => $dependencias->get($tc->dependencia_destino_id)['nombre'] ?? null,
+            ]);
+
         return response()->json($data);
     }
 

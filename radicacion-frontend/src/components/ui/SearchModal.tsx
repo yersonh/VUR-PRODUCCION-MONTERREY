@@ -94,10 +94,10 @@ export function SearchModal({
             role="dialog"
             aria-modal="true"
             aria-label={title}
-            className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh]"
+            className="relative w-full max-w-2xl bg-white/90 backdrop-blur-sm rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh]"
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4 bg-[#1B3A6E]">
+            <div className="flex items-center justify-between px-5 py-4 bg-[#0B1220]">
               <h2 className="text-white font-semibold text-sm tracking-wide uppercase">
                 {title}
               </h2>
@@ -121,7 +121,7 @@ export function SearchModal({
                   onChange={e => handleQueryChange(e.target.value)}
                   placeholder={searchPlaceholder}
                   maxLength={50}
-                  className="w-full pl-9 pr-12 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#2B5BA8]"
+                  className="w-full pl-9 pr-12 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800]"
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400">
                   {query.length}/50
@@ -173,7 +173,7 @@ export function SearchModal({
                           className={`
                             cursor-pointer border-b border-slate-100 transition-colors
                             ${isSelected
-                              ? 'bg-[#1B3A6E] text-white'
+                              ? 'bg-[#0B1220] text-white'
                               : 'hover:bg-blue-50 text-slate-700'
                             }
                           `}
@@ -197,7 +197,7 @@ export function SearchModal({
                 <button
                   type="button"
                   onClick={() => { onClose(); onCrear() }}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-[#1B3A6E] text-white text-xs font-semibold rounded-lg hover:bg-[#14306A] transition-colors"
+                  className="flex items-center gap-1.5 px-4 py-2 bg-[#0B1220] text-white text-xs font-semibold rounded-lg hover:bg-[#060911] transition-colors"
                 >
                   <PlusIcon className="w-3.5 h-3.5" />
                   {labelCrear}

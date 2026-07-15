@@ -20,7 +20,7 @@ const loginSchema = z.object({
   password: z
     .string()
     .min(1, 'La contraseña es requerida')
-    .min(6, 'La contraseña debe tener al menos 6 caracteres'),
+    .min(8, 'La contraseña debe tener al menos 8 caracteres'),
 })
 
 type LoginForm = z.infer<typeof loginSchema>
@@ -143,7 +143,7 @@ export default function Login() {
         backgroundImage: "url('/bg-login.jpg')", backgroundSize: 'cover', backgroundPosition: 'center'
       y coloca el archivo en radicacion-frontend/public/bg-login.jpg
     */
-    <div className="relative min-h-screen flex items-center justify-center p-4 overflow-hidden bg-[#0f2348]">
+    <div className="relative min-h-screen flex items-center justify-center p-4 overflow-hidden bg-[#0B1220]">
       {/* Fondo difuminado */}
       <div
         className="absolute inset-0 pointer-events-none"
@@ -158,14 +158,14 @@ export default function Login() {
       />
 
       {/* Velo oscuro para contraste con la tarjeta */}
-      <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-[#0f2348]/45 via-[#0f2348]/25 to-[#0f2348]/50" />
+      <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-[#0B1220]/45 via-[#0B1220]/25 to-[#0B1220]/50" />
 
       {/* Aura de color sobre el fondo */}
       <div
         className="fixed inset-0 pointer-events-none"
         style={{
           backgroundImage:
-            'radial-gradient(circle at 20% 80%, rgba(200,168,0,0.08) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(43,91,168,0.15) 0%, transparent 50%)',
+            'radial-gradient(circle at 20% 80%, rgba(200,168,0,0.08) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(31,140,111,0.14) 0%, transparent 50%)',
         }}
       />
 
@@ -189,7 +189,7 @@ export default function Login() {
           {/* Franja superior dorada */}
           <div
             className="h-1 w-full"
-            style={{ background: 'linear-gradient(90deg, #1B3A6E 0%, #2B5BA8 50%, #C8A800 100%)' }}
+            style={{ background: 'linear-gradient(90deg, #0B1220 0%, #1F8C6F 50%, #C8A800 100%)' }}
           />
 
           <div className="px-8 pt-8 pb-8">
@@ -288,7 +288,7 @@ export default function Login() {
                     focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#C8A800]/60
                     ${isLoading
                       ? 'bg-white/10 text-white/40 cursor-not-allowed'
-                      : 'text-[#0f2348] bg-gradient-to-r from-[#C8A800] to-[#e0be00] hover:from-[#d4b200] hover:to-[#f0ce00] shadow-lg shadow-[#C8A800]/30 hover:shadow-xl hover:shadow-[#C8A800]/40 active:scale-[0.98]'
+                      : 'text-[#0B1220] bg-gradient-to-r from-[#C8A800] to-[#e0be00] hover:from-[#d4b200] hover:to-[#f0ce00] shadow-lg shadow-[#C8A800]/30 hover:shadow-xl hover:shadow-[#C8A800]/40 active:scale-[0.98]'
                     }
                   `}
                   aria-busy={isLoading}

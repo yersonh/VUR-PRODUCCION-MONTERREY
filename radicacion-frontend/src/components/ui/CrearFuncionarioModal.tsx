@@ -136,10 +136,10 @@ export function CrearFuncionarioModal({ open, onClose, onCreado, defaultValues }
             role="dialog"
             aria-modal="true"
             aria-label="Registrar Funcionario"
-            className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+            className="relative w-full max-w-2xl bg-white/90 backdrop-blur-sm rounded-2xl shadow-2xl overflow-hidden flex flex-col"
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4 bg-[#1B3A6E]">
+            <div className="flex items-center justify-between px-5 py-4 bg-[#0B1220]">
               <div className="flex items-center gap-2">
                 <UserCircleIcon className="w-4 h-4 text-white/70" />
                 <h2 className="text-white font-semibold text-sm tracking-wide uppercase">
@@ -203,7 +203,7 @@ export function CrearFuncionarioModal({ open, onClose, onCreado, defaultValues }
                   {...register('dependencia_id', { valueAsNumber: true })}
                   aria-invalid={!!errors.dependencia_id}
                   className={cn(
-                    'px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#2B5BA8]',
+                    'px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800]',
                     errors.dependencia_id ? 'border-red-300' : 'border-slate-300',
                   )}
                 >

@@ -19,7 +19,6 @@ return new class extends Migration
         DB::table('roles')->insert([
             ['nombre' => 'ADMIN',             'descripcion' => 'Administrador del sistema'],
             ['nombre' => 'OPERADOR',          'descripcion' => 'Operador de radicación'],
-            ['nombre' => 'JEFE_DEPENDENCIA',  'descripcion' => 'Jefe de dependencia'],
             ['nombre' => 'FUNCIONARIO',       'descripcion' => 'Funcionario consulta'],
         ]);
     }

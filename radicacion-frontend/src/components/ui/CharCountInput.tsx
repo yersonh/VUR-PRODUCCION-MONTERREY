@@ -32,7 +32,7 @@ export const CharCountInput = forwardRef<HTMLInputElement, CharCountInputProps>(
             'placeholder:text-slate-400',
             readOnly
               ? 'bg-slate-50 text-slate-600 border-slate-200 cursor-default'
-              : 'bg-white text-slate-800 border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#2B5BA8]',
+              : 'bg-white text-slate-800 border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800]',
             error ? 'border-red-300 focus:ring-red-100 focus:border-red-400' : '',
             className
           )}

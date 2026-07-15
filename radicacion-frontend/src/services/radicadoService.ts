@@ -58,7 +58,6 @@ const radicadoService = {
   },
 
   actualizar: async (id: number, formData: FormData): Promise<Radicado> => {
-    formData.append('_method', 'PUT')
     const res = await api.post<{ data: Radicado }>(`/radicados/${id}`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })

@@ -251,7 +251,7 @@ export default function CatalogosAdmin() {
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0, transition: { duration: 0.25, ease: 'easeOut' as const } }}
-        className="p-6 max-w-5xl mx-auto space-y-6"
+        className="p-6 w-full space-y-6"
       >
         {/* Tabs */}
         <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
@@ -263,7 +263,7 @@ export default function CatalogosAdmin() {
               className={cn(
                 'px-4 py-2 rounded-lg text-sm font-medium transition-all',
                 tabActiva === tab.id
-                  ? 'bg-white text-[#1B3A6E] shadow-sm font-semibold'
+                  ? 'bg-white text-[#0B1220] shadow-sm font-semibold'
                   : 'text-slate-500 hover:text-slate-700',
               )}
             >
@@ -338,9 +338,9 @@ export default function CatalogosAdmin() {
           >
             <motion.div
               variants={modalVariants} initial="initial" animate="animate" exit="exit"
-              className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+              className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
             >
-              <div className="bg-[#1B3A6E] px-6 py-4 flex items-center justify-between">
+              <div className="bg-[#0B1220] px-6 py-4 flex items-center justify-between">
                 <h3 className="text-white font-semibold">
                   {editandoId ? `Editar — ${titulo}` : `Nuevo — ${titulo}`}
                 </h3>
@@ -356,7 +356,7 @@ export default function CatalogosAdmin() {
                   </label>
                   <input
                     {...register('descripcion')} maxLength={100}
-                    className={cn('w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#2B5BA8]', errors.descripcion ? 'border-red-400' : 'border-slate-300')}
+                    className={cn('w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800]', errors.descripcion ? 'border-red-400' : 'border-slate-300')}
                   />
                   {errors.descripcion && <p className="text-xs text-red-500 mt-1">{errors.descripcion.message}</p>}
                 </div>
@@ -370,7 +370,7 @@ export default function CatalogosAdmin() {
                       </label>
                       <select
                         {...register('tipo_correspondencia_id', { setValueAs: v => v === '' ? null : Number(v) })}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#2B5BA8]"
+                        className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800]"
                       >
                         <option value="">— Ninguno —</option>
                         {tiposCorrespondencia.map((t: TipoCorrespondencia) => (
@@ -382,7 +382,7 @@ export default function CatalogosAdmin() {
                       <label className="block text-xs font-semibold text-slate-600 mb-1">Zona</label>
                       <select
                         {...register('zona', { setValueAs: v => v === '' ? null : v })}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#2B5BA8]"
+                        className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800]"
                       >
                         <option value="">— Sin zona —</option>
                         <option value="URBANO">URBANO</option>
@@ -394,14 +394,14 @@ export default function CatalogosAdmin() {
 
                 {conToggle && (
                   <label className="flex items-center gap-2 cursor-pointer select-none">
-                    <input type="checkbox" {...register('activo')} className="w-4 h-4 accent-[#1B3A6E]" />
+                    <input type="checkbox" {...register('activo')} className="w-4 h-4 accent-[#0B1220]" />
                     <span className="text-sm text-slate-700">Activo</span>
                   </label>
                 )}
 
                 <div className="flex justify-end gap-3 pt-2">
                   <button type="button" onClick={cerrar} className="px-4 py-2 border border-slate-300 text-slate-600 rounded-xl text-sm hover:bg-slate-50 transition-colors">Cancelar</button>
-                  <button type="submit" disabled={guardando} className="px-6 py-2 bg-[#1B3A6E] hover:bg-[#14306A] text-white rounded-xl text-sm font-semibold transition-colors disabled:opacity-60">
+                  <button type="submit" disabled={guardando} className="px-6 py-2 bg-[#0B1220] hover:bg-[#060911] text-white rounded-xl text-sm font-semibold transition-colors disabled:opacity-60">
                     {guardando ? 'Guardando...' : 'Guardar'}
                   </button>
                 </div>

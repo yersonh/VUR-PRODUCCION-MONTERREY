@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\Radicado;
 use App\Services\ClienteCdr;
+use App\Services\NotificacionService;
 use App\Services\PdfStorageService;
 use App\Services\RadicadoService;
 use Illuminate\Bus\Queueable;
@@ -26,7 +27,7 @@ class EnviarSolicitudResidenciaACdr implements ShouldQueue
 
     public function __construct(private int $radicadoId) {}
 
-    public function handle(ClienteCdr $cdr, RadicadoService $service, PdfStorageService $pdfStorage): void
+    public function handle(ClienteCdr $cdr, RadicadoService $service, PdfStorageService $pdfStorage, NotificacionService $notificacion): void
     {
         $radicado = Radicado::with(['documentos', 'tercero'])->find($this->radicadoId);
 
@@ -45,9 +46,10 @@ class EnviarSolicitudResidenciaACdr implements ShouldQueue
         $remitente = $service->terceroInfo($radicado->tercero);
 
         try {
-            $cdr->enviarRecibido(
+            $resultado = $cdr->enviarRecibido(
                 datos: [
                     'radicado_vur'          => $radicado->numero_radicado,
+                    'referencia_cdr'        => $radicado->referencia_cdr,
                     'nombre_completo'       => $remitente['nombre_completo'] ?? $radicado->nombre_persona_empresa,
                     'numero_identificacion' => $remitente['nro_identificacion'] ?? null,
                     'correo'                => $remitente['email'] ?? null,
@@ -59,6 +61,15 @@ class EnviarSolicitudResidenciaACdr implements ShouldQueue
                 rutaPdfAbsoluta: $pdfStorage->rutaAbsoluta($documentoEntrada->ruta_almacenamiento),
                 nombreArchivo: $documentoEntrada->nombre_original,
             );
+
+            // 409: CDR ya tenía este radicado_vur registrado — casi siempre
+            // un choque de numeración entre los dos sistemas, no un reenvío
+            // inofensivo. El log ya queda en WARNING, pero eso se pierde
+            // fácil; se avisa también dentro del sistema para que un ADMIN
+            // lo note y revise del lado de CDR.
+            if ($resultado['ya_existe'] ?? false) {
+                $notificacion->notificarConflictoCdr($radicado);
+            }
         } catch (\Throwable $e) {
             // Con un worker de cola real (Redis/database), dejar que la
             // excepción se propague es lo correcto: el worker la atrapa y

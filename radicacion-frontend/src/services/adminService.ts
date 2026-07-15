@@ -14,6 +14,7 @@ export interface PersonalRow {
   dependencia_id: number
   dependencia?: Dependencia
   activo: boolean
+  tiene_usuario?: boolean
 }
 
 // ── Helper paginación ─────────────────────────────────────────────
@@ -43,6 +44,7 @@ export const usuariosAdmin = {
   create: (d: object) => api.post<User>('/admin/usuarios', d).then(r => r.data),
   update: (id: number, d: object) => api.put<User>(`/admin/usuarios/${id}`, d).then(r => r.data),
   toggle: (id: number) => api.patch<User>(`/admin/usuarios/${id}/toggle`).then(r => r.data),
+  resetPassword: (id: number) => api.patch<User>(`/admin/usuarios/${id}/reset-password`).then(r => r.data),
 }
 
 // ── Personal ──────────────────────────────────────────────────────

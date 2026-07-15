@@ -60,8 +60,8 @@ export function AdminTable<T extends { id: number }>({
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold text-[#1B3A6E]">{titulo}</h2>
-          <p className="text-sm text-slate-500">
+          <h2 className="text-lg font-bold text-white">{titulo}</h2>
+          <p className="text-sm text-slate-300">
             {cargando ? 'Cargando...' : `${total.toLocaleString()} registro${total !== 1 ? 's' : ''}`}
           </p>
         </div>
@@ -70,7 +70,7 @@ export function AdminTable<T extends { id: number }>({
             type="button"
             onClick={() => onPagina(pagina)}
             title="Recargar"
-            className="p-2 border border-slate-300 text-slate-600 rounded-xl hover:bg-slate-50 transition-colors"
+            className="p-2 border border-white/20 text-slate-200 rounded-xl hover:bg-white/10 transition-colors"
           >
             <ArrowPathIcon className={cn('w-4 h-4', cargando && 'animate-spin')} />
           </button>
@@ -93,21 +93,21 @@ export function AdminTable<T extends { id: number }>({
           onChange={e => onBuscar(e.target.value)}
           placeholder="Buscar..."
           maxLength={60}
-          className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#2B5BA8]"
+          className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800]"
         />
       </div>
 
       {/* Tabla */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-white/90 backdrop-blur-sm rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-[#1B3A6E] text-white">
+              <tr className="bg-[#0B1220] text-white">
                 {columnas.map(col => (
                   <th
                     key={String(col.key)}
                     style={col.width ? { width: col.width } : undefined}
-                    className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide"
+                    className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide whitespace-nowrap"
                   >
                     {col.label}
                   </th>
@@ -139,7 +139,7 @@ export function AdminTable<T extends { id: number }>({
                       )}
                     >
                       {columnas.map(col => (
-                        <td key={String(col.key)} className="px-4 py-2.5 text-slate-700">
+                        <td key={String(col.key)} className="px-4 py-2.5 text-slate-700 whitespace-nowrap">
                           {getCellValue(fila, col)}
                         </td>
                       ))}
@@ -152,7 +152,7 @@ export function AdminTable<T extends { id: number }>({
                                 type="button"
                                 onClick={() => onEditar(fila)}
                                 title="Editar"
-                                className="p-1.5 text-[#2B5BA8] hover:bg-blue-50 rounded-lg transition-colors"
+                                className="p-1.5 text-[#C8A800] hover:bg-blue-50 rounded-lg transition-colors"
                               >
                                 <PencilIcon className="w-3.5 h-3.5" />
                               </button>
@@ -191,7 +191,7 @@ export function AdminTable<T extends { id: number }>({
                     className={cn(
                       'w-7 h-7 rounded-lg text-xs font-medium transition-colors',
                       p === pagina
-                        ? 'bg-[#1B3A6E] text-white'
+                        ? 'bg-[#0B1220] text-white'
                         : 'border border-slate-300 text-slate-600 hover:bg-slate-100',
                     )}
                   >

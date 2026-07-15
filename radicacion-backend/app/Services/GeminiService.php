@@ -64,14 +64,8 @@ Extrae estos campos:
     Si no se puede determinar con certeza, devuelve null.
 - dependencia_remitente: nombre de la dependencia del remitente cuando tipo_remitente_sugerido es "FUNCIONARIO" (cualquier secretaría, oficina o área mencionada junto a su nombre). null en los demás casos.
 - cargo_remitente: cargo o título del remitente cuando tipo_remitente_sugerido es "FUNCIONARIO" (ej: "Secretario de Despacho", "Alcalde Municipal", "Jefe de Oficina", "Director"). Extraer solo el cargo, sin incluir la dependencia. null en los demás casos.
-- tipo_destinatario: clasifica a quién va dirigido el documento (a quién está dirigida la correspondencia, no quién la firma) como exactamente uno de estos tres valores:
-    "INTERNO" si va dirigido a un funcionario o dependencia de la Alcaldía de Monterrey Casanare (aparece cargo público + dependencia municipal en el destinatario).
-    "EMPRESA" si va dirigido a una entidad externa (empresa, ONG, organismo, otra alcaldía o gobernación) distinta a la Alcaldía de Monterrey Casanare.
-    "CIUDADANO" si va dirigido a una persona natural externa sin cargo institucional.
-    Si el documento no tiene destinatario explícito o no se puede determinar, devuelve null.
-- nombre_destinatario: nombre completo de la persona a quien va dirigido el documento. null si no aparece.
-- dependencia_destino: nombre de la secretaría, oficina o área a la que va dirigido el documento, solo si tipo_destinatario es "INTERNO". null en los demás casos.
-- nombre_empresa_destino: nombre de la entidad o empresa destino, solo si tipo_destinatario es "EMPRESA". null en los demás casos.
+- nombre_destinatario: nombre completo de la persona a quien va dirigido el documento dentro de la Alcaldía de Monterrey Casanare. null si no aparece.
+- dependencia_destino: nombre de la secretaría, oficina o área de la Alcaldía de Monterrey Casanare a la que va dirigido el documento (toda correspondencia radicada aquí se enruta internamente, así que intenta identificarla siempre que el texto la mencione, sin importar si el destinatario aparece con cargo público explícito). null si no se puede determinar ninguna dependencia.
 - cargo_destinatario: cargo del destinatario si aparece (ej: "Secretario de Despacho", "Licenciado"). null si no aparece.
 - es_solicitud_residencia: true si el documento es una solicitud de carta/constancia de residencia (el remitente pide que se le expida una carta certificando que reside en el municipio, usualmente para un trámite, postulación laboral o similar). false en cualquier otro caso.
     Si es_solicitud_residencia es true y el documento está dirigido de forma genérica a "la Alcaldía de Monterrey Casanare" / "Alcaldía Municipal" sin nombrar una secretaría, oficina o dependencia específica, usa dependencia_destino = "Despacho del Alcalde" (solo el Alcalde despacha esas solicitudes; NO apliques esta regla para otros tipos de documento — si no es solicitud de residencia y no hay dependencia específica mencionada, deja dependencia_destino en null).

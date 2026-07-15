@@ -14,7 +14,8 @@ class User extends Authenticatable
 
     protected $fillable = [
         'name', 'email', 'password',
-        'role_id', 'dependencia_id', 'activo',
+        'role_id', 'dependencia_id', 'activo', 'foto_path',
+        'funcionario_id', 'debe_cambiar_password',
     ];
 
     protected $hidden = ['password', 'remember_token'];
@@ -22,9 +23,10 @@ class User extends Authenticatable
     protected function casts(): array
     {
         return [
-            'email_verified_at' => 'datetime',
-            'password'          => 'hashed',
-            'activo'            => 'boolean',
+            'email_verified_at'      => 'datetime',
+            'password'               => 'hashed',
+            'activo'                 => 'boolean',
+            'debe_cambiar_password'  => 'boolean',
         ];
     }
 
@@ -33,9 +35,10 @@ class User extends Authenticatable
         return $this->belongsTo(Role::class);
     }
 
-    // 'dependencia_id' ya no es una relación Eloquent: apunta a una
-    // dependencia del Core (sin FK local). Se resuelve vía ClienteCore
-    // donde se necesite mostrarla (ver AuthController/UserAdminController).
+    // 'dependencia_id' y 'funcionario_id' ya no son relaciones Eloquent:
+    // apuntan a recursos del Core (sin FK local). Se resuelven vía
+    // ClienteCore donde se necesiten mostrar (ver AuthController/
+    // UserAdminController).
 
     public function isAdmin(): bool
     {

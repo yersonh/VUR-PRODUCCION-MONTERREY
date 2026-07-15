@@ -10,13 +10,13 @@ interface InstitucionalHeaderProps {
 
 export function InstitucionalHeader({ subtitle, onToggleSidebar }: InstitucionalHeaderProps) {
   return (
-    <header className="fixed top-0 left-0 right-0 z-40 h-14 bg-[#1B3A6E] shadow-lg flex items-center gap-3 px-4">
-      {/* Hamburger */}
+    <header className="fixed top-0 left-0 right-0 z-40 h-14 bg-[#0B1220] shadow-lg flex items-center gap-3 px-4">
+      {/* Hamburger (solo móvil, el panel es estático en escritorio) */}
       <button
         type="button"
         onClick={onToggleSidebar}
         aria-label="Abrir menú"
-        className="text-white/70 hover:text-white transition-colors p-1 rounded-lg hover:bg-white/10"
+        className="lg:hidden text-white/70 hover:text-white transition-colors p-1 rounded-lg hover:bg-white/10"
       >
         <Bars3Icon className="w-5 h-5" />
       </button>

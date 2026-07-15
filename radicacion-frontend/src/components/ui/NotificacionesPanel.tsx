@@ -1,12 +1,14 @@
 import { useRef, useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import toast from 'react-hot-toast'
 import {
   BellIcon,
   InboxArrowDownIcon,
   ArrowPathIcon,
   CheckCircleIcon,
   ExclamationTriangleIcon,
+  DocumentCheckIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline'
 import { BellAlertIcon } from '@heroicons/react/24/solid'
@@ -44,6 +46,46 @@ const TIPO_CONFIG = {
     bg: 'rgba(251,191,36,0.12)',
     border: 'rgba(251,191,36,0.2)',
   },
+  RESPUESTA_CARGADA: {
+    icon: <DocumentCheckIcon className="w-4 h-4" />,
+    color: 'text-[#C8A800]',
+    bg: 'rgba(200,168,0,0.12)',
+    border: 'rgba(200,168,0,0.2)',
+  },
+  CDR_CONFLICTO: {
+    icon: <ExclamationTriangleIcon className="w-4 h-4" />,
+    color: 'text-red-400',
+    bg: 'rgba(248,113,113,0.12)',
+    border: 'rgba(248,113,113,0.2)',
+  },
+}
+
+function NotificacionToast({ notif, onClick }: { notif: Notificacion; onClick: () => void }) {
+  const cfg = TIPO_CONFIG[notif.tipo] ?? TIPO_CONFIG.ESTADO_CAMBIADO
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex gap-3 items-start text-left w-80 max-w-[90vw] rounded-xl px-4 py-3"
+      style={{
+        background: 'rgba(8, 18, 44, 0.97)',
+        backdropFilter: 'blur(20px)',
+        border: '1px solid rgba(255,255,255,0.12)',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.45)',
+      }}
+    >
+      <div
+        className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${cfg.color}`}
+        style={{ background: cfg.bg, border: `1px solid ${cfg.border}` }}
+      >
+        {cfg.icon}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-white text-xs font-semibold leading-snug">{notif.titulo}</p>
+        <p className="text-white/60 text-[11px] leading-relaxed mt-0.5 line-clamp-3">{notif.mensaje}</p>
+      </div>
+    </button>
+  )
 }
 
 export function NotificacionesPanel() {
@@ -53,35 +95,63 @@ export function NotificacionesPanel() {
   const [notifs, setNotifs] = useState<Notificacion[]>([])
   const [noLeidas, setNoLeidas] = useState(0)
   const [cargando, setCargando] = useState(false)
+  const vistasRef = useRef<Set<number> | null>(null)
 
-  const fetchCount = useCallback(async () => {
-    try {
-      const count = await notificacionService.noLeidas()
-      setNoLeidas(count)
-    } catch { /* silencioso */ }
-  }, [])
+  const mostrarPopup = useCallback((notif: Notificacion) => {
+    toast.custom(
+      (t) => (
+        <div style={{ opacity: t.visible ? 1 : 0, transition: 'opacity 0.2s' }}>
+          <NotificacionToast
+            notif={notif}
+            onClick={async () => {
+              toast.dismiss(t.id)
+              await notificacionService.marcarLeida(notif.id)
+              setNotifs(prev => prev.map(n => n.id === notif.id ? { ...n, leida: true } : n))
+              setNoLeidas(v => Math.max(0, v - 1))
+              if (notif.radicado_id) navigate(`/radicados/${notif.radicado_id}`)
+            }}
+          />
+        </div>
+      ),
+      { duration: 8000, id: `notif-${notif.id}` }
+    )
+  }, [navigate])
 
-  const fetchAll = useCallback(async () => {
+  // Trae la lista completa; detecta notificaciones sin leer que no se
+  // habían visto todavía y muestra un popup por cada una para que no pasen
+  // desapercibidas aunque el usuario no abra la campanita.
+  const fetchAll = useCallback(async (mostrarPopups: boolean) => {
     setCargando(true)
     try {
       const data = await notificacionService.listar()
       setNotifs(data)
       setNoLeidas(data.filter(n => !n.leida).length)
+
+      if (vistasRef.current === null) {
+        vistasRef.current = new Set(data.map(n => n.id))
+      } else {
+        const nuevas = data.filter(n => !n.leida && !vistasRef.current!.has(n.id))
+        for (const notif of nuevas) {
+          vistasRef.current.add(notif.id)
+          if (mostrarPopups) mostrarPopup(notif)
+        }
+        for (const n of data) vistasRef.current.add(n.id)
+      }
     } catch { /* silencioso */ } finally {
       setCargando(false)
     }
-  }, [])
+  }, [mostrarPopup])
 
-  // Polling cada 30s para el badge
+  // Polling cada 30s: refresca el badge y dispara popups de lo nuevo
   useEffect(() => {
-    fetchCount()
-    const id = setInterval(fetchCount, POLL_INTERVAL)
+    fetchAll(true)
+    const id = setInterval(() => fetchAll(true), POLL_INTERVAL)
     return () => clearInterval(id)
-  }, [fetchCount])
+  }, [fetchAll])
 
-  // Al abrir el panel, cargar lista completa
+  // Al abrir el panel, refrescar sin duplicar popups (ya se muestran por polling)
   useEffect(() => {
-    if (open) fetchAll()
+    if (open) fetchAll(false)
   }, [open, fetchAll])
 
   // Cerrar al hacer click fuera
