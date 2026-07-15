@@ -56,12 +56,14 @@ class BrevoMailService
             .($responsable ? $this->campo('Responsable de la respuesta', $responsable, true) : '')
             .($fechaLimite ? $this->campo('Plazo de respuesta', $fechaLimite, false, self::COLOR_ALERTA) : '');
 
+        // Sin botón: este correo va al remitente (ciudadano/empresa/funcionario
+        // externo), que no tiene cuenta en VUR — un link a /radicados/{id}
+        // solo lo mandaría a la pantalla de login sin forma de entrar.
         $contenido = $this->saludo($destinatarioNombre)
             ."<p style='margin:0 0 4px'>Le confirmamos que su correspondencia fue registrada exitosamente en el sistema, bajo el siguiente número de radicado:</p>"
             .$this->insignia($numeroRadicado, self::COLOR_ACENTO)
             ."<table style='width:100%;border-collapse:collapse;border:1px solid ".self::COLOR_BORDE.";border-radius:10px;overflow:hidden'>{$ficha}</table>"
             ."<p style='margin:20px 0 0'>Le sugerimos conservar este número, ya que será su referencia para cualquier consulta posterior sobre el trámite.</p>"
-            .$this->boton('Consultar mi radicado', $this->urlRadicado($radicadoId))
             .$this->firma();
 
         $html = $this->plantillaBase('Correspondencia radicada', self::COLOR_ACENTO, $contenido);
@@ -143,10 +145,15 @@ class BrevoMailService
 
     /**
      * Avisa que ya hay una respuesta (PDF de salida) disponible para un
-     * radicado. Se usa tanto para el operador que lo radicó como para el
-     * remitente — mismo mensaje, distinto destinatario. Si se provee el
-     * contenido del PDF de respuesta, se adjunta directamente al correo
-     * (además del botón que lleva al sistema).
+     * radicado. Se usa tanto para el operador que lo radicó (tiene cuenta en
+     * VUR) como para el remitente (ciudadano/empresa/funcionario externo,
+     * sin cuenta) — mismo mensaje, distinto destinatario. Si se provee el
+     * contenido del PDF de respuesta, se adjunta directamente al correo.
+     *
+     * @param bool $incluirBotonVerSistema Solo debe ir en true para
+     *   destinatarios con cuenta en VUR (el operador) — para el remitente,
+     *   el link a /radicados/{id} solo lo llevaría a la pantalla de login
+     *   sin forma de entrar.
      */
     public function enviarRespuestaDisponible(
         string $email,
@@ -155,7 +162,8 @@ class BrevoMailService
         string $fechaRespuesta,
         ?int $radicadoId = null,
         ?string $pdfContenido = null,
-        ?string $pdfNombreArchivo = null
+        ?string $pdfNombreArchivo = null,
+        bool $incluirBotonVerSistema = true
     ): bool {
         if (empty($this->apiKey) || empty($email)) {
             return false;
@@ -171,16 +179,18 @@ class BrevoMailService
             ]);
         }
 
-        $textoDocumento = $hayAdjunto
-            ? 'Encontrará el documento de respuesta adjunto a este correo. También puede consultarlo e imprimirlo ingresando al sistema.'
-            : 'Puede consultar e imprimir el documento de respuesta ingresando al sistema.';
+        $textoDocumento = match (true) {
+            $hayAdjunto && $incluirBotonVerSistema  => 'Encontrará el documento de respuesta adjunto a este correo. También puede consultarlo e imprimirlo ingresando al sistema.',
+            $hayAdjunto && !$incluirBotonVerSistema => 'Encontrará el documento de respuesta adjunto a este correo.',
+            default                                 => 'Puede consultar e imprimir el documento de respuesta ingresando al sistema.',
+        };
 
         $contenido = $this->saludo($nombre)
             ."<p style='margin:0 0 4px'>Nos permitimos informarle que ya se encuentra disponible la respuesta al siguiente radicado:</p>"
             .$this->insignia($numeroRadicado, self::COLOR_EXITO)
             ."<table style='width:100%;border-collapse:collapse;border:1px solid ".self::COLOR_BORDE.";border-radius:10px;overflow:hidden'>{$ficha}</table>"
             ."<p style='margin:20px 0 0'>{$textoDocumento}</p>"
-            .$this->boton('Ver respuesta', $this->urlRadicado($radicadoId))
+            .($incluirBotonVerSistema ? $this->boton('Ver respuesta', $this->urlRadicado($radicadoId)) : '')
             .$this->firma();
 
         $html = $this->plantillaBase('Respuesta disponible', self::COLOR_EXITO, $contenido);
@@ -252,11 +262,12 @@ class BrevoMailService
         $ficha = $this->campo('Estado actual', "<strong>{$estadoDescripcion}</strong>", false, $color)
             .($observacion ? $this->campo('Observación', $observacion, true) : '');
 
+        // Sin botón: este correo siempre va al remitente (ciudadano/empresa/
+        // funcionario externo), que no tiene cuenta en VUR.
         $contenido = $this->saludo($nombre)
             ."<p style='margin:0 0 4px'>{$introHtml}</p>"
             .$this->insignia($numeroRadicado, $color)
             ."<table style='width:100%;border-collapse:collapse;border:1px solid ".self::COLOR_BORDE.";border-radius:10px;overflow:hidden'>{$ficha}</table>"
-            .$this->boton('Ver detalle del radicado', $this->urlRadicado($radicadoId))
             .$this->firma();
 
         $html = $this->plantillaBase($titulo, $color, $contenido);
