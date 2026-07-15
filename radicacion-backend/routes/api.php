@@ -49,6 +49,7 @@ Route::prefix('v1')->group(function () {
     // en él (ver RadicadoService::adjuntarPdf()) — sin sesión, igual que la
     // consulta pública de certificados de CDR.
     Route::get('verificar-respuesta/{codigo}', [VerificacionPublicaController::class, 'verificar']);
+    Route::get('verificar-respuesta/{codigo}/pdf', [VerificacionPublicaController::class, 'descargar']);
 
     // ── Protegidas con Sanctum ───────────────────────────────────
     Route::middleware('auth:sanctum')->group(function () {

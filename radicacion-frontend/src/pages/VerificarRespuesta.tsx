@@ -6,6 +6,7 @@ import {
   CheckCircleIcon,
   XCircleIcon,
   ExclamationCircleIcon,
+  ArrowDownTrayIcon,
 } from '@heroicons/react/24/outline'
 import { verificacionService, type VerificacionResult } from '@/services/verificacionService'
 import { AlcaldiaLogo } from '@/components/ui/AlcaldiaLogo'
@@ -38,6 +39,7 @@ export default function VerificarRespuesta() {
   }
 
   const doc = resultado?.documento
+  const apiUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:8000/api/v1'
 
   return (
     <div className="relative min-h-screen flex items-center justify-center p-4 overflow-hidden bg-[#0B1220]">
@@ -106,6 +108,12 @@ export default function VerificarRespuesta() {
                   onKeyDown={(e) => e.key === 'Enter' && buscar()}
                   placeholder="Código de verificación (ej. ABCD-1234)"
                   className="w-full pl-10 pr-4 py-3 rounded-xl border text-sm uppercase text-white placeholder-white/30 bg-black/25 border-white/12 focus:outline-none focus:ring-2 focus:ring-[#C8A800]/40 focus:border-[#C8A800]/70 focus:bg-black/30 transition-all duration-200"
+                  style={{
+                    colorScheme: 'dark',
+                    WebkitTextFillColor: 'white',
+                    WebkitBoxShadow: '0 0 0px 1000px rgba(0,0,0,0.25) inset',
+                    transition: 'background-color 5000s ease-in-out 0s',
+                  }}
                 />
               </div>
               <button
@@ -143,6 +151,15 @@ export default function VerificarRespuesta() {
                       </div>
                     ))}
                   </dl>
+
+                  <a href={`${apiUrl}/verificar-respuesta/${doc.codigo_verificacion}/pdf`} target="_blank" rel="noreferrer">
+                    <button
+                      type="button"
+                      className="w-full flex items-center justify-center gap-2.5 py-3 px-6 rounded-xl font-bold text-sm text-[#0B1220] bg-gradient-to-r from-[#C8A800] to-[#e0be00] hover:from-[#d4b200] hover:to-[#f0ce00] shadow-lg shadow-[#C8A800]/30 hover:shadow-xl hover:shadow-[#C8A800]/40 active:scale-[0.98] transition-all duration-200"
+                    >
+                      <ArrowDownTrayIcon className="w-4 h-4" /> Descargar documento
+                    </button>
+                  </a>
                 </div>
               ) : (
                 <div className="flex items-start gap-3 rounded-xl border border-red-400/30 bg-red-500/15 p-4">
