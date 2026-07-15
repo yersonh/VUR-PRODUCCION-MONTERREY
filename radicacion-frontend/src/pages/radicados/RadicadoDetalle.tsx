@@ -191,7 +191,7 @@ export default function RadicadoDetalle() {
     try {
       await abrirPdfEnNuevaVentana(path)
     } catch {
-      toast.error('No se pudo abrir el PDF')
+      toast.error('No se pudo abrir el documento')
     }
   }
 

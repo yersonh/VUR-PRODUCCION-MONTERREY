@@ -311,10 +311,14 @@ class RadicadoController extends Controller
         $ruta = $documento->ruta_almacenamiento;
         abort_unless(Storage::disk('local')->exists($ruta), 404, 'Archivo no encontrado en disco');
 
+        // Los anexos aceptan PDF o imagen (ver reglas en agregarAnexos()/
+        // SolicitudCartaResidenciaController) — usar el mime_type real
+        // guardado al subir, no asumir siempre PDF, o el navegador intenta
+        // abrir una imagen con su visor de PDF y falla.
         return response()->file(
             Storage::disk('local')->path($ruta),
             [
-                'Content-Type'        => 'application/pdf',
+                'Content-Type'        => $documento->mime_type ?: 'application/pdf',
                 'Content-Disposition' => "inline; filename=\"{$documento->nombre_original}\"",
             ]
         );
