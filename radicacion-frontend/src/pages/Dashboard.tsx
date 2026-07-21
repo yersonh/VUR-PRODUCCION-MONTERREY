@@ -16,7 +16,7 @@ export default function Dashboard() {
         <div className="bg-gradient-to-r from-[#0B1220] to-[#C8A800] rounded-2xl p-6 text-white flex items-center gap-5">
           <AlcaldiaLogo size="lg" />
           <div>
-            <h1 className="text-xl font-bold">Bienvenido, {user?.name}</h1>
+            <h1 className="text-xl font-bold">Bienvenido, <span className="text-2xl md:text-3xl">{user?.name}</span></h1>
             <p className="text-blue-200 text-sm mt-1">Sistema de Radicación de Correspondencia · Alcaldía de Monterrey</p>
             {esFuncionario && (user?.dependencia || user?.cargo) && (
               <p className="text-blue-100/90 text-xs mt-1">
