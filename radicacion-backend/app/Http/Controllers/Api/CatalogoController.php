@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuxTip;
+use App\Models\DependenciaLider;
 use App\Models\EstadoCorrespondencia;
 use App\Models\MedioIngreso;
 use App\Models\TipoAnexo;
@@ -23,6 +24,12 @@ class CatalogoController extends Controller
 
     public function dependencias(): JsonResponse
     {
+        // lider_id es solo el id plano del funcionario — el nombre se resuelve
+        // client-side vía GET /personal/{id} cuando hace falta (ver
+        // RadicadoNuevo.tsx), para no pagar una llamada al Core por cada
+        // dependencia en un endpoint que se llama en cada carga del catálogo.
+        $lideres = DependenciaLider::pluck('funcionario_id', 'dependencia_id');
+
         $data = collect($this->core->dependencias())
             ->where('activo', true)
             ->sortBy('nombre')
@@ -31,6 +38,7 @@ class CatalogoController extends Controller
                 'id'          => $d['id'],
                 'descripcion' => $d['nombre'],
                 'activo'      => $d['activo'],
+                'lider_id'    => $lideres->get($d['id']),
             ]);
 
         return response()->json($data);

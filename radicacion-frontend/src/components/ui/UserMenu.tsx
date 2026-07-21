@@ -375,10 +375,10 @@ export function UserMenu() {
             ) : initials}
           </div>
           <div className="hidden lg:block text-left">
-            <p className="text-white text-xs font-semibold leading-none max-w-[120px] truncate">
+            <p className="text-white text-sm font-semibold leading-none max-w-[160px] truncate">
               {user?.name}
             </p>
-            <p className="text-[#C8A800]/80 text-[10px] mt-0.5 font-medium">{roleLabel}</p>
+            <p className="text-[#C8A800]/80 text-xs mt-1 font-medium">{roleLabel}</p>
           </div>
           <ChevronDownIcon
             className={`w-3.5 h-3.5 text-white/50 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
@@ -436,7 +436,7 @@ export function UserMenu() {
                     </button>
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-white font-bold text-sm leading-snug truncate">{user?.name}</p>
+                    <p className="text-white font-bold text-base leading-snug truncate">{user?.name}</p>
                     <p className="text-blue-300/70 text-[11px] truncate mt-0.5">{user?.email}</p>
                     <span className={`inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${roleColor}`}>
                       <ShieldCheckIcon className="w-3 h-3" />
@@ -445,10 +445,20 @@ export function UserMenu() {
                   </div>
                 </div>
 
-                {user?.dependencia && (
-                  <div className="mt-3 px-3 py-2 rounded-lg bg-white/5 border border-white/8">
-                    <p className="text-white/40 text-[10px] uppercase tracking-wider font-semibold">Dependencia</p>
-                    <p className="text-white/75 text-xs mt-0.5 font-medium">{user.dependencia.descripcion}</p>
+                {(user?.dependencia || user?.cargo) && (
+                  <div className="mt-3 px-3 py-2 rounded-lg bg-white/5 border border-white/8 space-y-1.5">
+                    {user?.cargo && (
+                      <div>
+                        <p className="text-white/40 text-[10px] uppercase tracking-wider font-semibold">Cargo</p>
+                        <p className="text-white/75 text-xs mt-0.5 font-medium">{user.cargo}</p>
+                      </div>
+                    )}
+                    {user?.dependencia && (
+                      <div>
+                        <p className="text-white/40 text-[10px] uppercase tracking-wider font-semibold">Dependencia</p>
+                        <p className="text-white/75 text-xs mt-0.5 font-medium">{user.dependencia.descripcion}</p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

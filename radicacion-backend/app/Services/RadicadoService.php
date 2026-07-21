@@ -69,7 +69,7 @@ class RadicadoService
             // Calcular fecha límite
             $tipoCorr = TipoCorrespondencia::findOrFail($datos['tipo_correspondencia_id']);
             $fechaLimite = $tipoCorr->max_dias > 0
-                ? $hoy->copy()->addWeekdays($tipoCorr->max_dias)->toDateString()
+                ? $hoy->copy()->addWeekdays($tipoCorr->max_dias)->toDateTimeString()
                 : null;
 
             // Estado inicial
@@ -154,10 +154,10 @@ class RadicadoService
                     destinatarioEmail:      $emailRemitente,
                     destinatarioNombre:     $nombreRemitente,
                     numeroRadicado:         $radicado->numeroRadicado,
-                    fechaRadicacion:        $radicado->fecha_radicacion,
+                    fechaRadicacion:        Carbon::parse($radicado->fecha_radicacion->format('Y-m-d').' '.$radicado->hora_radicacion)->format('d/m/Y h:i A'),
                     tipoCorrespondencia:    $radicado->tipoCorrespondencia?->descripcion ?? '',
                     dependenciaDestino:     $this->dependenciaInfo($radicado->dependencia_destino_id)['descripcion'] ?? '',
-                    fechaLimite:            $radicado->fecha_limite,
+                    fechaLimite:            $radicado->fecha_limite?->format('d/m/Y h:i A'),
                     responsable:            $responsableInfo['nombre_completo'] ?? null,
                     radicadoId:             $radicado->id,
                 );
@@ -223,17 +223,23 @@ class RadicadoService
      * repite ese chequeo. Al adjuntarlo, el radicado pasa automáticamente a
      * RESPONDIDO (subir la respuesta ES la acción de responder) y se avisa
      * al operador que radicó la entrada y al remitente.
+     *
+     * $estamparQr controla si se le pega el sello QR de verificación de VUR.
+     * Debe ir en false cuando el PDF llega desde CDR (ver
+     * SolicitudCartaResidenciaController::actualizarEstado()) — ese
+     * certificado ya viene con su propio QR de CDR incrustado; estampar el
+     * de VUR encima duplicaba el QR en el documento final.
      */
-    public function adjuntarPdfSalida(Radicado $radicado, UploadedFile $file, int $usuarioId): Radicado
+    public function adjuntarPdfSalida(Radicado $radicado, UploadedFile $file, int $usuarioId, bool $estamparQr = true): Radicado
     {
-        DB::transaction(function () use ($radicado, $file, $usuarioId) {
+        DB::transaction(function () use ($radicado, $file, $usuarioId, $estamparQr) {
             // Eliminar PDF salida anterior si existe
             $anterior = $radicado->documentos()->where('tipo', 'SALIDA')->first();
             if ($anterior) {
                 $this->pdfStorage->eliminar($anterior->ruta_almacenamiento);
                 $anterior->delete();
             }
-            $this->adjuntarPdf($radicado, $file, 'SALIDA', $usuarioId);
+            $this->adjuntarPdf($radicado, $file, 'SALIDA', $usuarioId, $estamparQr);
         });
 
         $radicado->load('estado');
@@ -382,7 +388,7 @@ class RadicadoService
         })->all();
     }
 
-    private function adjuntarPdf(Radicado $radicado, UploadedFile $file, string $tipo, int $subidoPor): RadicadoDocumento
+    private function adjuntarPdf(Radicado $radicado, UploadedFile $file, string $tipo, int $subidoPor, bool $estamparQr = true): RadicadoDocumento
     {
         $codigoVerificacion = null;
         $nombreOriginal = $file->getClientOriginalName();
@@ -393,9 +399,9 @@ class RadicadoService
         // documento puede llegar como escaneo (solo imagen) o con texto real;
         // a FPDI no le importa, solo importa la página tal cual y dibuja el
         // QR encima, sin volver a interpretar el contenido.
-        if ($tipo === 'SALIDA') {
+        if ($tipo === 'SALIDA' && $estamparQr) {
             $codigoVerificacion = $this->codigoVerificacionUnico();
-            $urlVerificacion = rtrim(env('FRONTEND_URL', 'http://localhost:5173'), '/')
+            $urlVerificacion = rtrim(config('services.frontend.url_publica'), '/')
                 ."/verificar-respuesta?codigo={$codigoVerificacion}";
 
             $qrPng = $this->qr->png($urlVerificacion);

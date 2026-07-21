@@ -32,7 +32,7 @@ class GeminiService
         }
 
         try {
-            $fileUri = $this->subirArchivo($filePath, $displayName);
+            $fileUri = $this->subirArchivo($filePath, $displayName, 'application/pdf');
         } catch (\Throwable $e) {
             Log::error('GeminiService: fallo al subir PDF a File API', ['error' => $e->getMessage()]);
             return 'No se pudo subir el PDF a Gemini: '.$e->getMessage();
@@ -42,6 +42,8 @@ class GeminiService
 Eres un asistente OCR especializado en correspondencia oficial colombiana.
 El documento puede ser un PDF escaneado (imagen). Usa visión para leer el texto visible.
 Si un campo no es legible o no aparece, devuelve null para ese campo.
+
+Normalización de mayúsculas/minúsculas: el documento original puede tener nombres escritos en cualquier combinación de mayúsculas y minúsculas (TODO MAYÚSCULAS, todo minúsculas, o mixto — esto es habitual en firmas, sellos y membretes escaneados). Para nombre_remitente, nombre_persona_empresa, nombre_destinatario, dependencia_remitente, dependencia_destino, cargo_remitente y cargo_destinatario, normaliza siempre el resultado a formato Título (cada palabra inicia en mayúscula y el resto en minúscula; conectores como "de", "del", "la", "los", "y" van en minúscula salvo que sean la primera palabra). No transcribas la capitalización tal cual aparece en el documento. Esto es importante porque el sistema compara estos nombres contra personas y dependencias ya registradas, y una misma persona no debe registrarse dos veces solo porque su nombre aparece con distinta mayúscula/minúscula en cada documento.
 
 Extrae estos campos:
 - nombre_remitente: nombre completo de quien firma o envía el documento
@@ -143,13 +145,101 @@ PROMPT;
     }
 
     /**
+     * Lee el número de documento de identidad (cédula) desde una imagen o PDF
+     * de un documento de identificación. Usado para validar el anexo de
+     * cédula contra el número registrado del ciudadano en Solicitud Carta
+     * de Residencia. Retorna el número como string, o null/string de error.
+     */
+    public function extraerNumeroIdentificacion(string $filePath, string $displayName, string $mimeType): array|string|null
+    {
+        if (empty($this->apiKey)) {
+            Log::warning('GeminiService: GEMINI_API_KEY no configurado');
+            return 'GEMINI_API_KEY no está configurada en el servidor.';
+        }
+
+        try {
+            $fileUri = $this->subirArchivo($filePath, $displayName, $mimeType);
+        } catch (\Throwable $e) {
+            Log::error('GeminiService: fallo al subir documento de identidad a File API', ['error' => $e->getMessage()]);
+            return 'No se pudo subir el documento a Gemini: '.$e->getMessage();
+        }
+
+        $prompt = <<<PROMPT
+Eres un asistente OCR especializado en documentos de identidad colombianos (cédula de ciudadanía).
+La imagen o PDF puede ser un escaneo o foto del documento. Usa visión para leer el texto visible.
+
+Extrae únicamente:
+- nro_identificacion: el número de cédula (solo dígitos, sin puntos ni espacios). null si no es legible o no aparece.
+
+Responde solo el JSON con ese campo.
+PROMPT;
+
+        $payload = [
+            'contents' => [[
+                'parts' => [
+                    ['text' => $prompt],
+                    ['file_data' => ['mime_type' => $mimeType, 'file_uri' => $fileUri]],
+                ],
+            ]],
+            'generationConfig' => [
+                'temperature'      => 0.1,
+                'maxOutputTokens'  => 512,
+                'thinkingConfig'   => ['thinkingBudget' => 0],
+                'responseMimeType' => 'application/json',
+            ],
+        ];
+
+        $url      = "{$this->baseUrl}/models/{$this->model}:generateContent?key={$this->apiKey}";
+        $intentos = 5;
+
+        for ($i = 1; $i <= $intentos; $i++) {
+            try {
+                $response = Http::timeout(60)->post($url, $payload);
+
+                // 503 / 429 con retry-after → esperar y reintentar (mismo
+                // criterio que analizarPdf: la cuota gratuita de Gemini es
+                // por minuto, así que un pequeño respiro suele bastar).
+                if (in_array($response->status(), [503, 429])) {
+                    $retryAfter = (int) ($response->header('Retry-After') ?: ($i * 5));
+                    Log::warning("GeminiService: {$response->status()} extrayendo cédula, intento {$i}/{$intentos}, esperando {$retryAfter}s");
+                    if ($i < $intentos) {
+                        sleep(min($retryAfter, 30));
+                        continue;
+                    }
+                    return 'Gemini API sobrecargada o sin cuota disponible. Intenta en unos minutos.';
+                }
+
+                if (! $response->successful()) {
+                    $msg = $response->json('error.message') ?? $response->body();
+                    Log::error('GeminiService: error extrayendo cédula', ['status' => $response->status(), 'msg' => $msg]);
+                    return "Error de Gemini API ({$response->status()}): {$msg}";
+                }
+
+                $text = $response->json('candidates.0.content.parts.0.text', '');
+                $data = $this->parseJson($text);
+
+                if (! is_array($data)) {
+                    return 'Gemini no devolvió un JSON válido.';
+                }
+
+                return $data;
+            } catch (ConnectionException $e) {
+                Log::error("GeminiService: timeout extrayendo cédula, intento {$i}", ['error' => $e->getMessage()]);
+                if ($i < $intentos) { sleep(3); continue; }
+                return 'Timeout al conectar con Gemini API.';
+            }
+        }
+
+        return 'Gemini API no disponible tras varios intentos.';
+    }
+
+    /**
      * Sube un archivo a la Gemini File API mediante resumable upload
      * y retorna su file_uri para referenciarlo en generateContent.
      */
-    private function subirArchivo(string $filePath, string $displayName): string
+    private function subirArchivo(string $filePath, string $displayName, string $mimeType = 'application/pdf'): string
     {
-        $bytes    = filesize($filePath);
-        $mimeType = 'application/pdf';
+        $bytes = filesize($filePath);
 
         $startResp = Http::withHeaders([
             'X-Goog-Upload-Protocol'             => 'resumable',

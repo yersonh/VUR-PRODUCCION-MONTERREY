@@ -2,6 +2,18 @@
 
 return [
 
+    // ── Frontend público ─────────────────────────────────────────────
+    // URL base que se incrusta en artefactos que salen del sistema hacia
+    // gente real (QR de verificación en PDFs, botones de los correos) —
+    // separada de FRONTEND_URL (que solo controla el origen permitido por
+    // CORS) porque en un entorno de desarrollo apuntando a una BD/Brevo
+    // compartidos, FRONTEND_URL suele ser http://localhost:xxxx (útil para
+    // CORS local) pero un QR o un link de correo con esa URL es inservible
+    // para quien lo recibe. Si no se define, cae de vuelta a FRONTEND_URL.
+    'frontend' => [
+        'url_publica' => env('FRONTEND_PUBLIC_URL', env('FRONTEND_URL', 'http://localhost:5173')),
+    ],
+
     'postmark' => ['key' => env('POSTMARK_API_KEY')],
     'resend'   => ['key' => env('RESEND_API_KEY')],
     'ses'      => [
@@ -33,6 +45,11 @@ return [
         'url'                                 => env('CDR_API_URL'),
         'token'                               => env('CDR_API_TOKEN'),
         'tipo_correspondencia_residencia_id'  => env('VUR_TIPO_CORRESPONDENCIA_RESIDENCIA_ID', 90),
+        // TipoAnexo "Cédula de Ciudadanía" — sembrado en
+        // 2026_07_20_000001_seed_tipo_anexo_cedula.php. Usado para exigir
+        // el anexo de cédula en el flujo de Solicitud Carta de Residencia
+        // y para la validación IA del número de documento.
+        'tipo_anexo_cedula_id'                => env('VUR_TIPO_ANEXO_CEDULA_ID', 100),
         // Usuario "de sistema" que queda como operador_id de los radicados
         // creados automáticamente por el intake público de CDR (ver
         // SolicitudCartaResidenciaController). Sembrado en la migración

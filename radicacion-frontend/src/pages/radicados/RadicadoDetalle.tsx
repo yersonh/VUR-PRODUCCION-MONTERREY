@@ -7,7 +7,7 @@ import {
   ArrowLeftIcon, DocumentArrowDownIcon,
   ArrowPathIcon, NoSymbolIcon, CheckCircleIcon,
   ClockIcon, DocumentCheckIcon, SparklesIcon,
-  TrashIcon, PaperClipIcon,
+  TrashIcon,
 } from '@heroicons/react/24/outline'
 
 import { AppLayout } from '@/components/layout/AppLayout'
@@ -97,10 +97,6 @@ export default function RadicadoDetalle() {
   const [subiendoPdfSalida, setSubiendoPdfSalida] = useState(false)
   const [pdfSalida, setPdfSalida] = useState<File | null>(null)
 
-  const [nuevoAnexoDescripcion, setNuevoAnexoDescripcion] = useState('')
-  const [nuevoAnexoTipoId, setNuevoAnexoTipoId] = useState<number | null>(null)
-  const [nuevoAnexoArchivo, setNuevoAnexoArchivo] = useState<File | null>(null)
-  const [agregandoAnexo, setAgregandoAnexo] = useState(false)
   const [eliminandoAnexoId, setEliminandoAnexoId] = useState<number | null>(null)
 
   const esAdmin = user?.role?.nombre === 'ADMIN'
@@ -152,27 +148,6 @@ export default function RadicadoDetalle() {
     }
   }
 
-  const handleAgregarAnexo = async () => {
-    if (!radicado || !nuevoAnexoDescripcion.trim()) return
-    setAgregandoAnexo(true)
-    try {
-      const fd = new FormData()
-      fd.append('anexos[0][descripcion]', nuevoAnexoDescripcion.trim())
-      if (nuevoAnexoTipoId) fd.append('anexos[0][tipo_id]', String(nuevoAnexoTipoId))
-      if (nuevoAnexoArchivo) fd.append('anexos[0][archivo]', nuevoAnexoArchivo)
-      const actualizado = await radicadoService.agregarAnexos(radicado.id, fd)
-      setRadicado(actualizado)
-      setNuevoAnexoDescripcion('')
-      setNuevoAnexoTipoId(null)
-      setNuevoAnexoArchivo(null)
-      toast.success('Anexo agregado')
-    } catch {
-      toast.error('Error al agregar el anexo')
-    } finally {
-      setAgregandoAnexo(false)
-    }
-  }
-
   const handleEliminarAnexo = async (documentoId: number) => {
     if (!radicado) return
     setEliminandoAnexoId(documentoId)
@@ -198,6 +173,12 @@ export default function RadicadoDetalle() {
   const formatFecha = (f?: string) => {
     if (!f) return '—'
     try { return format(parseISO(f), 'dd/MM/yyyy', { locale: es }) }
+    catch { return f }
+  }
+
+  const formatFechaHora = (f?: string) => {
+    if (!f) return '—'
+    try { return format(parseISO(f), 'dd/MM/yyyy hh:mm a', { locale: es }) }
     catch { return f }
   }
 
@@ -241,7 +222,7 @@ export default function RadicadoDetalle() {
   if (!radicado) return null
 
   return (
-    <AppLayout subtitle={`Radicado ${formatNumeroRadicado(radicado.nro_radicado, radicado.año_radicado)}`}>
+    <AppLayout subtitle={`Radicado ${formatNumeroRadicado(radicado.año_radicado, radicado.nro_radicado)}`}>
       <div className="flex-1 p-4 md:p-6 max-w-screen-xl mx-auto w-full space-y-4">
 
         {/* ── Encabezado ─────────────────────────────────────────── */}
@@ -256,7 +237,7 @@ export default function RadicadoDetalle() {
             <div>
               <div className="flex items-center gap-3">
                 <h1 className="text-xl font-bold text-white font-mono">
-                  {formatNumeroRadicado(radicado.nro_radicado, radicado.año_radicado)}
+                  {formatNumeroRadicado(radicado.año_radicado, radicado.nro_radicado)}
                 </h1>
                 {estadoActual && <EstadoBadge estado={estadoActual} />}
                 {radicado.ia_procesado && (
@@ -331,7 +312,7 @@ export default function RadicadoDetalle() {
                   <Campo label="Asunto" value={radicado.aux_descripcion} />
                   <Campo
                     label="Fecha límite"
-                    value={radicado.fecha_limite ? formatFecha(radicado.fecha_limite) : 'Sin límite'}
+                    value={radicado.fecha_limite ? formatFechaHora(radicado.fecha_limite) : 'Sin límite'}
                   />
                 </div>
               </Seccion>
@@ -352,7 +333,7 @@ export default function RadicadoDetalle() {
                   <Campo label="De" value={radicado.folios_de ?? '—'} />
                   <Campo label="Medio Ingreso" value={radicado.medio_ingreso?.descripcion} />
                   <Campo label="Fecha Documento" value={formatFecha(radicado.fecha_documento)} />
-                  <Campo label="Fecha Entrega" value={formatFecha(radicado.fecha_entrega)} />
+                  <Campo label="Fecha Entrega" value={formatFechaHora(radicado.fecha_entrega)} />
                 </div>
 
                 {/* Lista de anexos */}
@@ -404,48 +385,6 @@ export default function RadicadoDetalle() {
                   </div>
                 ) : null}
 
-                {/* Agregar anexo nuevo */}
-                {puedeEditarAnexos && (
-                  <div className="mt-3 p-3 bg-slate-50 border border-dashed border-slate-300 rounded-xl space-y-2">
-                    <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
-                      <PaperClipIcon className="w-3.5 h-3.5" /> Agregar anexo
-                    </span>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                      <input
-                        type="text"
-                        value={nuevoAnexoDescripcion}
-                        onChange={e => setNuevoAnexoDescripcion(e.target.value)}
-                        placeholder="Descripción del anexo"
-                        maxLength={150}
-                        className="sm:col-span-1 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800]"
-                      />
-                      <select
-                        value={nuevoAnexoTipoId ?? ''}
-                        onChange={e => setNuevoAnexoTipoId(e.target.value ? Number(e.target.value) : null)}
-                        className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800]"
-                      >
-                        <option value="">Tipo de anexo...</option>
-                        {tiposAnexo.map(t => (
-                          <option key={t.id} value={t.id}>{t.descripcion}</option>
-                        ))}
-                      </select>
-                      <input
-                        type="file"
-                        accept="application/pdf"
-                        onChange={e => setNuevoAnexoArchivo(e.target.files?.[0] ?? null)}
-                        className="text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-blue-50 file:text-[#C8A800] hover:file:bg-blue-100"
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleAgregarAnexo}
-                      disabled={!nuevoAnexoDescripcion.trim() || agregandoAnexo}
-                      className="px-4 py-1.5 bg-[#C8A800] hover:bg-[#0B1220] text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
-                    >
-                      {agregandoAnexo ? 'Agregando...' : '+ Agregar anexo'}
-                    </button>
-                  </div>
-                )}
               </Seccion>
 
               {radicado.observaciones && (
@@ -587,7 +526,7 @@ export default function RadicadoDetalle() {
                     <div className="h-px bg-white/10" />
                     <div className="flex justify-between text-sm">
                       <span className="text-blue-200">Fecha límite</span>
-                      <span className="font-medium text-[#C8A800]">{formatFecha(radicado.fecha_limite)}</span>
+                      <span className="font-medium text-[#C8A800]">{formatFechaHora(radicado.fecha_limite)}</span>
                     </div>
                   </>
                 )}
@@ -624,7 +563,7 @@ export default function RadicadoDetalle() {
       <ConfirmDialog
         open={confirmAnular}
         title="¿Anular radicado?"
-        message={`Se anulará el radicado ${formatNumeroRadicado(radicado.nro_radicado, radicado.año_radicado)}. Esta acción no se puede deshacer.`}
+        message={`Se anulará el radicado ${formatNumeroRadicado(radicado.año_radicado, radicado.nro_radicado)}. Esta acción no se puede deshacer.`}
         labelSi="Sí, anular"
         labelNo="No, cancelar"
         onSi={handleAnular}

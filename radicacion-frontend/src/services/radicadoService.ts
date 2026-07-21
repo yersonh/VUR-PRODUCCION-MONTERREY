@@ -79,6 +79,22 @@ const radicadoService = {
     const res = await api.delete<{ data: Radicado }>(`/radicados/${id}/anexos/${documentoId}`)
     return res.data.data
   },
+
+  exportarCsv: async (filtros: RadicadoFiltros = {}): Promise<void> => {
+    const { page: _page, per_page: _perPage, ...resto } = filtros
+    const params = Object.fromEntries(
+      Object.entries(resto).filter(([, v]) => v !== '' && v != null)
+    )
+    const res = await api.get('/radicados/export', { params, responseType: 'blob' })
+    const url = URL.createObjectURL(new Blob([res.data], { type: 'text/csv;charset=utf-8' }))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'radicados.csv'
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  },
 }
 
 export default radicadoService

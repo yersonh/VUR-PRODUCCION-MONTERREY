@@ -107,7 +107,7 @@ export function useRadicadoForm() {
 
   const form = useForm<RadicadoFormValues>({
     resolver: zodResolver(radicadoSchema),
-    defaultValues: { ...DEFAULT_VALUES, fecha_entrega: today },
+    defaultValues: { ...DEFAULT_VALUES, fecha_entrega: `${today}T${nowTime}` },
     mode: 'onBlur',
   })
 
@@ -144,7 +144,7 @@ export function useRadicadoForm() {
   }
 
   const resetForm = () => {
-    form.reset({ ...DEFAULT_VALUES, fecha_entrega: format(new Date(), 'yyyy-MM-dd') })
+    form.reset({ ...DEFAULT_VALUES, fecha_entrega: format(new Date(), "yyyy-MM-dd'T'HH:mm") })
     setDisplay(DISPLAY_INIT)
     setTieneAnexos(null)
     setPdfEntrada(null)

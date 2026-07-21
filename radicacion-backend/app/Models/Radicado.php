@@ -28,9 +28,9 @@ class Radicado extends Model
 
     protected $casts = [
         'fecha_radicacion'    => 'date',
-        'fecha_limite'        => 'date',
+        'fecha_limite'        => 'datetime',
         'fecha_documento'     => 'date',
-        'fecha_entrega'       => 'date',
+        'fecha_entrega'       => 'datetime',
         'ia_procesado'        => 'boolean',
         'ia_campos_sugeridos' => 'array',
         'anexos'              => 'array',

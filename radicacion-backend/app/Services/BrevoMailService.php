@@ -352,7 +352,7 @@ class BrevoMailService
 
     private function urlFrontend(): string
     {
-        return rtrim(env('FRONTEND_URL', 'http://localhost:5173'), '/');
+        return rtrim(config('services.frontend.url_publica'), '/');
     }
 
     private function urlRadicado(?int $radicadoId): string

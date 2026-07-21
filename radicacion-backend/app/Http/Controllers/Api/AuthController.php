@@ -164,9 +164,25 @@ class AuthController extends Controller
                 'descripcion' => $user->role->descripcion,
             ] : null,
             'dependencia'     => $this->dependenciaInfo($user->dependencia_id),
-            'tiene_foto'      => (bool) $user->foto_path,
+            'cargo'           => $this->cargoFuncionario($user->funcionario_id),
+            'tiene_foto'      => (bool) $user->foto_path && Storage::disk('local')->exists($user->foto_path),
             'debe_cambiar_password' => $user->debe_cambiar_password,
         ];
+    }
+
+    private function cargoFuncionario(?int $funcionarioId): ?string
+    {
+        if (!$funcionarioId) {
+            return null;
+        }
+
+        try {
+            $funcionario = $this->core->funcionario($funcionarioId);
+        } catch (\Throwable $e) {
+            return null;
+        }
+
+        return $funcionario['cargo'] ?? null;
     }
 
     private function dependenciaInfo(?int $id): ?array

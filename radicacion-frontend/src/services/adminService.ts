@@ -15,6 +15,7 @@ export interface PersonalRow {
   dependencia?: Dependencia
   activo: boolean
   tiene_usuario?: boolean
+  es_lider?: boolean
 }
 
 // ── Helper paginación ─────────────────────────────────────────────
@@ -27,6 +28,25 @@ export const depAdmin = {
   create: (d: object) => api.post<Dependencia>('/admin/dependencias', d).then(r => r.data),
   update: (id: number, d: object) => api.put<Dependencia>(`/admin/dependencias/${id}`, d).then(r => r.data),
   toggle: (id: number) => api.patch<Dependencia>(`/admin/dependencias/${id}/toggle`).then(r => r.data),
+}
+
+// ── Líder de dependencia ────────────────────────────────────────────
+export interface LiderInfo {
+  id: number
+  cedula: string
+  nombre_completo: string
+  cargo?: string | null
+  email?: string | null
+}
+
+export const dependenciaLiderAdmin = {
+  asignar: (dependenciaId: number, funcionarioId: number, forzar = false) =>
+    api.put<{ dependencia_id: number; lider: LiderInfo }>(`/admin/dependencias/${dependenciaId}/lider`, {
+      funcionario_id: funcionarioId,
+      forzar,
+    }).then(r => r.data),
+  quitar: (dependenciaId: number) =>
+    api.delete(`/admin/dependencias/${dependenciaId}/lider`).then(r => r.data),
 }
 
 // ── Tipos Correspondencia ─────────────────────────────────────────

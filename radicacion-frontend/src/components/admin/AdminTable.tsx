@@ -93,7 +93,7 @@ export function AdminTable<T extends { id: number }>({
           onChange={e => onBuscar(e.target.value)}
           placeholder="Buscar..."
           maxLength={60}
-          className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800]"
+          className="w-full pl-9 pr-4 py-2 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800]"
         />
       </div>
 

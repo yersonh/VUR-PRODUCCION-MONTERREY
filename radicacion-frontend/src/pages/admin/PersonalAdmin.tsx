@@ -8,7 +8,8 @@ import toast from 'react-hot-toast'
 import { XMarkIcon, PowerIcon, UserPlusIcon } from '@heroicons/react/24/outline'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { AdminTable } from '@/components/admin/AdminTable'
-import { personalAdmin, type PersonalRow } from '@/services/adminService'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { personalAdmin, dependenciaLiderAdmin, type PersonalRow, type LiderInfo } from '@/services/adminService'
 import { useCatalogoStore } from '@/store/catalogoStore'
 import { cn } from '@/lib/utils'
 
@@ -21,6 +22,7 @@ const schema = z.object({
   telefono:       z.string().regex(/^[\d\s\+\-\(\)]{7,15}$/, 'Teléfono inválido').or(z.literal('')).optional(),
   dependencia_id: z.number().min(1, 'Seleccione una dependencia'),
   activo:         z.boolean(),
+  es_lider:       z.boolean(),
 })
 
 type FormData = z.infer<typeof schema>
@@ -52,10 +54,13 @@ export default function PersonalAdmin() {
   const [editando, setEditando] = useState<PersonalRow | null>(null)
   const [modalAbierto, setModalAbierto] = useState(false)
   const [guardando, setGuardando] = useState(false)
+  const [conflictoLider, setConflictoLider] = useState<{
+    funcionarioId: number; dependenciaId: number; liderActual: string
+  } | null>(null)
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { activo: true },
+    defaultValues: { activo: true, es_lider: false },
   })
 
   const cargar = useCallback(async (pagina: number, q: string) => {
@@ -76,7 +81,7 @@ export default function PersonalAdmin() {
 
   const abrirNuevo = () => {
     setEditando(null)
-    reset({ cedula: '', nombres: '', apellidos: '', cargo: '', email: '', telefono: '', dependencia_id: undefined, activo: true })
+    reset({ cedula: '', nombres: '', apellidos: '', cargo: '', email: '', telefono: '', dependencia_id: undefined, activo: true, es_lider: false })
     setModalAbierto(true)
   }
 
@@ -91,29 +96,69 @@ export default function PersonalAdmin() {
       telefono:       p.telefono ?? '',
       dependencia_id: p.dependencia_id,
       activo:         p.activo,
+      es_lider:       p.es_lider ?? false,
     })
     setModalAbierto(true)
   }
 
   const cerrar = () => { setModalAbierto(false); setEditando(null) }
 
+  // Guarda/quita el rol de líder según lo marcado en el formulario. Si la
+  // dependencia ya tiene otro líder, el backend responde 409 con quién es —
+  // en ese caso se abre el ConfirmDialog de reemplazo en vez de fallar en
+  // silencio (el funcionario en sí ya quedó guardado correctamente).
+  const aplicarLider = async (funcionarioId: number, dependenciaId: number, esLider: boolean, wasLider: boolean) => {
+    if (esLider) {
+      try {
+        await dependenciaLiderAdmin.asignar(dependenciaId, funcionarioId)
+      } catch (err: unknown) {
+        const resp = (err as { response?: { status?: number; data?: { lider_actual?: LiderInfo } } })?.response
+        if (resp?.status === 409 && resp.data?.lider_actual) {
+          setConflictoLider({ funcionarioId, dependenciaId, liderActual: resp.data.lider_actual.nombre_completo })
+          return
+        }
+        toast.error('No se pudo asignar como líder de la dependencia')
+      }
+    } else if (wasLider) {
+      await dependenciaLiderAdmin.quitar(dependenciaId)
+    }
+  }
+
   const onSubmit = async (data: FormData) => {
+    const wasLider = editando?.es_lider ?? false
     setGuardando(true)
     try {
+      let id: number
       if (editando) {
         await personalAdmin.update(editando.id, data)
+        id = editando.id
         toast.success('Personal actualizado')
       } else {
-        await personalAdmin.create(data)
+        const creado = await personalAdmin.create(data)
+        id = creado.id
         toast.success('Personal creado')
       }
       cerrar()
       cargar(estado.pagina, busqueda)
+      await aplicarLider(id, data.dependencia_id, data.es_lider, wasLider)
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
       toast.error(msg ?? 'Error al guardar')
     } finally {
       setGuardando(false)
+    }
+  }
+
+  const confirmarReemplazoLider = async () => {
+    if (!conflictoLider) return
+    try {
+      await dependenciaLiderAdmin.asignar(conflictoLider.dependenciaId, conflictoLider.funcionarioId, true)
+      toast.success('Líder de dependencia reasignado')
+      cargar(estado.pagina, busqueda)
+    } catch {
+      toast.error('No se pudo reasignar el líder')
+    } finally {
+      setConflictoLider(null)
     }
   }
 
@@ -156,6 +201,14 @@ export default function PersonalAdmin() {
       key: 'dependencia' as const,
       label: 'Dependencia',
       render: (p: PersonalRow) => <span className="text-xs text-slate-500">{p.dependencia?.descripcion ?? '—'}</span>,
+    },
+    {
+      key: 'es_lider' as const,
+      label: 'Líder',
+      width: '80px',
+      render: (p: PersonalRow) => p.es_lider
+        ? <span className="text-xs px-2 py-0.5 rounded-full bg-[#C8A800]/15 text-[#8a7300] border border-[#C8A800]/40 font-semibold">Líder</span>
+        : <span className="text-xs text-slate-300">—</span>,
     },
     {
       key: 'tiene_usuario' as const,
@@ -297,10 +350,19 @@ export default function PersonalAdmin() {
                   </div>
                 </div>
 
-                <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <input type="checkbox" {...register('activo')} className="w-4 h-4 accent-[#0B1220]" />
-                  <span className="text-sm text-slate-700">Activo</span>
-                </label>
+                <div className="flex flex-col gap-2">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input type="checkbox" {...register('activo')} className="w-4 h-4 accent-[#0B1220]" />
+                    <span className="text-sm text-slate-700">Activo</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input type="checkbox" {...register('es_lider')} className="w-4 h-4 accent-[#C8A800]" />
+                    <span className="text-sm text-slate-700">Líder de esta dependencia</span>
+                  </label>
+                  <p className="text-xs text-slate-400 -mt-1">
+                    Solo puede haber un líder por dependencia. Se usa como responsable por defecto al radicar hacia esta dependencia.
+                  </p>
+                </div>
 
                 <div className="flex justify-end gap-3 pt-2">
                   <button type="button" onClick={cerrar} className="px-4 py-2 border border-slate-300 text-slate-600 rounded-xl text-sm hover:bg-slate-50 transition-colors">Cancelar</button>
@@ -313,6 +375,16 @@ export default function PersonalAdmin() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <ConfirmDialog
+        open={conflictoLider != null}
+        title="Ya hay un líder para esta dependencia"
+        message={`"${conflictoLider?.liderActual}" ya es el líder de esta dependencia. ¿Deseas reemplazarlo por este funcionario?`}
+        labelSi="Sí, reemplazar"
+        labelNo="No, dejarlo así"
+        onSi={confirmarReemplazoLider}
+        onNo={() => setConflictoLider(null)}
+      />
     </AppLayout>
   )
 }

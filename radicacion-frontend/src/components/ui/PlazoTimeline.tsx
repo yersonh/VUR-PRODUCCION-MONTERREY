@@ -18,6 +18,7 @@ interface Paso {
   fecha: Date | null
   sublabel?: string
   acento?: 'oro' | 'teal'
+  conHora?: boolean
 }
 
 function parseFecha(valor?: string | null): Date | null {
@@ -37,7 +38,7 @@ export function PlazoTimeline({ fechaDocumento, fechaIngreso, diasHabiles }: Pla
     if (docFecha) {
       items.push({ key: 'documento', icono: DocumentTextIcon, label: 'Fecha Documento', fecha: docFecha })
     }
-    items.push({ key: 'ingreso', icono: InboxArrowDownIcon, label: 'Fecha de Ingreso', fecha: ingresoFecha })
+    items.push({ key: 'ingreso', icono: InboxArrowDownIcon, label: 'Fecha de Ingreso', fecha: ingresoFecha, conHora: true })
     items.push({
       key: 'limite',
       icono: FlagIcon,
@@ -45,6 +46,7 @@ export function PlazoTimeline({ fechaDocumento, fechaIngreso, diasHabiles }: Pla
       fecha: limiteFecha,
       sublabel: sinLimite ? 'Sin límite' : diasHabiles ? `${diasHabiles} día${diasHabiles > 1 ? 's' : ''} hábil${diasHabiles > 1 ? 'es' : ''}` : undefined,
       acento: 'oro',
+      conHora: true,
     })
     return items
   }, [fechaDocumento, fechaIngreso, diasHabiles])
@@ -105,7 +107,9 @@ export function PlazoTimeline({ fechaDocumento, fechaIngreso, diasHabiles }: Pla
                 {paso.label}
               </span>
               <span className={cn('text-sm font-bold mt-0.5', tieneFecha ? 'text-[#0B1220]' : 'text-slate-300')}>
-                {paso.fecha ? format(paso.fecha, 'dd/MM/yyyy', { locale: es }) : '—'}
+                {paso.fecha
+                  ? format(paso.fecha, paso.conHora ? "dd/MM/yyyy hh:mm a" : 'dd/MM/yyyy', { locale: es })
+                  : '—'}
               </span>
               {paso.sublabel && (
                 <span className="text-[11px] text-slate-400 mt-0.5">{paso.sublabel}</span>

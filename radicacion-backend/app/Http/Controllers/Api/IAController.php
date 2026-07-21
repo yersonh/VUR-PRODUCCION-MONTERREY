@@ -37,4 +37,29 @@ class IAController extends Controller
 
         return response()->json(['campos' => $resultado]);
     }
+
+    // Lee el número de cédula desde el anexo de cédula subido en el flujo de
+    // Solicitud Carta de Residencia, para validarlo contra el ciudadano.
+    public function analizarCedulaAnexo(Request $request): JsonResponse
+    {
+        set_time_limit(180);
+
+        $request->validate([
+            'archivo' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:20480'],
+        ]);
+
+        $file     = $request->file('archivo');
+        $mimeType = $file->getMimeType() ?: 'application/pdf';
+
+        $resultado = $this->gemini->extraerNumeroIdentificacion($file->getRealPath(), $file->getClientOriginalName(), $mimeType);
+
+        if (! is_array($resultado)) {
+            return response()->json([
+                'message'           => $resultado ?? 'No se pudo analizar el documento con IA',
+                'nro_identificacion' => null,
+            ], 422);
+        }
+
+        return response()->json(['nro_identificacion' => $resultado['nro_identificacion'] ?? null]);
+    }
 }

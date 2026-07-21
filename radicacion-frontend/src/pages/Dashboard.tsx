@@ -18,6 +18,11 @@ export default function Dashboard() {
           <div>
             <h1 className="text-xl font-bold">Bienvenido, {user?.name}</h1>
             <p className="text-blue-200 text-sm mt-1">Sistema de Radicación de Correspondencia · Alcaldía de Monterrey</p>
+            {esFuncionario && (user?.dependencia || user?.cargo) && (
+              <p className="text-blue-100/90 text-xs mt-1">
+                {[user?.cargo, user?.dependencia?.descripcion].filter(Boolean).join(' · ')}
+              </p>
+            )}
             <span className="inline-block mt-2 px-3 py-1 bg-white/20 text-white text-xs rounded-full font-medium">
               {user?.role?.nombre}
             </span>

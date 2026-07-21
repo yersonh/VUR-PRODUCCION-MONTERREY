@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CatalogoController;
+use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\IAController;
 use App\Http\Controllers\Api\PersonalController;
 use App\Http\Controllers\Api\RadicadoController;
@@ -10,6 +11,7 @@ use App\Http\Controllers\Api\NotificacionController;
 use App\Http\Controllers\Api\SolicitudCartaResidenciaController;
 use App\Http\Controllers\Api\VerificacionPublicaController;
 use App\Http\Controllers\Api\Admin\DependenciaAdminController;
+use App\Http\Controllers\Api\Admin\DependenciaLiderController;
 use App\Http\Controllers\Api\Admin\TipoCorrespondenciaAdminController;
 use App\Http\Controllers\Api\Admin\UserAdminController;
 use App\Http\Controllers\Api\Admin\PersonalAdminController;
@@ -45,6 +47,17 @@ Route::prefix('v1')->group(function () {
         ->middleware('cdr.token')
         ->where('radicadoVur', '\d{4}-\d{6}');
 
+    // Lectura de reportes/catálogos para el panel de CDR (Alcalde): mismo
+    // token de servicio, solo lectura. Reutiliza los mismos controladores
+    // que /admin/reportes y /catalogos — no dependen de sesión de usuario,
+    // solo de los filtros de query string.
+    Route::middleware('cdr.token')->prefix('cdr')->group(function () {
+        Route::get('reportes', [ReportesAdminController::class, 'index']);
+        Route::get('reportes/export', [ReportesAdminController::class, 'export']);
+        Route::get('catalogos/estados', [CatalogoController::class, 'estados']);
+        Route::get('catalogos/tipos-correspondencia', [CatalogoController::class, 'tiposCorrespondencia']);
+    });
+
     // Consulta pública del documento de respuesta a partir del QR estampado
     // en él (ver RadicadoService::adjuntarPdf()) — sin sesión, igual que la
     // consulta pública de certificados de CDR.
@@ -67,6 +80,9 @@ Route::prefix('v1')->group(function () {
             Route::post('auth/foto',   [AuthController::class, 'subirFoto']);
             Route::delete('auth/foto', [AuthController::class, 'eliminarFoto']);
 
+            // Dashboard — KPIs del día a día para ADMIN/OPERADOR.
+            Route::get('dashboard/resumen', [DashboardController::class, 'resumen'])->middleware('no-funcionario');
+
             // Catálogos (GET — sin cache en esta versión, baja frecuencia)
             Route::get('dependencias',            [CatalogoController::class, 'dependencias']);
             Route::get('tipos-correspondencia',   [CatalogoController::class, 'tiposCorrespondencia']);
@@ -83,9 +99,11 @@ Route::prefix('v1')->group(function () {
             Route::post('terceros/{tercero}/contactos', [TerceroController::class, 'storeContacto']);
             Route::get('personal',  [PersonalController::class, 'index']);
             Route::post('personal', [PersonalController::class, 'store']);
+            Route::get('personal/{personal}', [PersonalController::class, 'show']);
 
             // IA
             Route::post('ia/analizar-pdf', [IAController::class, 'analizarPdf']);
+            Route::post('ia/analizar-cedula-anexo', [IAController::class, 'analizarCedulaAnexo']);
 
             // Notificaciones
             Route::get('notificaciones',                          [NotificacionController::class, 'index']);
@@ -95,6 +113,7 @@ Route::prefix('v1')->group(function () {
 
             // Radicados — CRUD + acciones
             Route::get('radicados/siguiente-numero',   [RadicadoController::class, 'siguienteNumero']);
+            Route::get('radicados/export',              [RadicadoController::class, 'export']);
             Route::get('radicados',                    [RadicadoController::class, 'index']);
             Route::post('radicados',                   [RadicadoController::class, 'store']);
             Route::get('radicados/{id}',               [RadicadoController::class, 'show']);
@@ -114,6 +133,8 @@ Route::prefix('v1')->group(function () {
                 Route::post('dependencias',                        [DependenciaAdminController::class, 'store']);
                 Route::put('dependencias/{dependencia}',           [DependenciaAdminController::class, 'update']);
                 Route::patch('dependencias/{dependencia}/toggle',  [DependenciaAdminController::class, 'toggleActivo']);
+                Route::put('dependencias/{dependencia}/lider',     [DependenciaLiderController::class, 'asignar']);
+                Route::delete('dependencias/{dependencia}/lider',  [DependenciaLiderController::class, 'quitar']);
 
                 // Tipos Correspondencia
                 Route::get('tipos-correspondencia',                              [TipoCorrespondenciaAdminController::class, 'index']);

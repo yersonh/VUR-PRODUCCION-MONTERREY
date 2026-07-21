@@ -81,6 +81,17 @@ class PersonalController extends Controller
         return response()->json($this->aFila($funcionario), 201);
     }
 
+    // Lookup directo por id — usado por el frontend para resolver el
+    // funcionario líder de una dependencia sin depender de que aparezca en
+    // la página del listado paginado del Core (ver limitación documentada
+    // arriba: /funcionarios no filtra por dependencia_id del lado del Core).
+    public function show(int $personal): JsonResponse
+    {
+        $funcionario = $this->core->funcionario($personal);
+
+        return response()->json($this->aFila($funcionario));
+    }
+
     private function aFila(array $funcionario): array
     {
         $persona = $funcionario['persona'] ?? [];

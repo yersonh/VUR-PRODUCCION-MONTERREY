@@ -124,6 +124,13 @@ export default function DependenciasAdmin() {
   const columnas = [
     { key: 'id'          as const, label: '#',           width: '60px' },
     { key: 'descripcion' as const, label: 'Descripción' },
+    {
+      key: 'lider_nombre' as const,
+      label: 'Líder',
+      render: (dep: Dependencia) => dep.lider_nombre
+        ? <span className="text-xs text-slate-600">{dep.lider_nombre}</span>
+        : <span className="text-xs text-slate-300">Sin asignar</span>,
+    },
     { key: 'activo'      as const, label: 'Estado',      width: '90px' },
   ]
 

@@ -95,6 +95,7 @@ export default function RadicadoListado() {
   const [meta, setMeta] = useState({ current_page: 1, last_page: 1, total: 0, per_page: 20 })
   const [cargando, setCargando] = useState(false)
   const [cdrPendientes, setCdrPendientes] = useState(0)
+  const [exportando, setExportando] = useState(false)
 
   const cargar = useCallback(async (f: RadicadoFiltros) => {
     setCargando(true)
@@ -168,6 +169,17 @@ export default function RadicadoListado() {
     filtrosAplicados.remitente || filtrosAplicados.tipo_correspondencia_id ||
     filtrosAplicados.dependencia_destino_id
   )
+
+  const exportarExcel = async () => {
+    setExportando(true)
+    try {
+      await radicadoService.exportarCsv(filtrosAplicados)
+    } catch {
+      toast.error('Error al exportar los radicados')
+    } finally {
+      setExportando(false)
+    }
+  }
 
   const formatFecha = (fecha: string) => {
     try { return format(parseISO(fecha), 'dd/MM/yyyy', { locale: es }) }
@@ -274,7 +286,7 @@ export default function RadicadoListado() {
               onKeyDown={e => e.key === 'Enter' && aplicarFiltros()}
               placeholder="Buscar por número (ej: 2026-000123)..."
               maxLength={15}
-              className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800]"
+              className="w-full pl-9 pr-4 py-2 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800]"
             />
           </div>
           <select
@@ -379,9 +391,11 @@ export default function RadicadoListado() {
                 <button
                   type="button"
                   title="Exportar Excel"
-                  className="flex items-center gap-1.5 px-3 py-1.5 border border-green-300 text-green-700 hover:bg-green-50 rounded-lg text-xs font-medium transition-colors"
+                  onClick={exportarExcel}
+                  disabled={exportando}
+                  className="flex items-center gap-1.5 px-3 py-1.5 border border-green-300 text-green-700 hover:bg-green-50 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <DocumentArrowDownIcon className="w-3.5 h-3.5" /> Excel
+                  <DocumentArrowDownIcon className="w-3.5 h-3.5" /> {exportando ? 'Exportando…' : 'Excel'}
                 </button>
               </div>
             </div>
@@ -457,7 +471,7 @@ export default function RadicadoListado() {
                         <div className="flex items-center gap-2">
                           <ProcedenciaBadge valor={fila.procedencia} />
                           <span className="font-mono font-bold text-[#0B1220] text-sm">
-                            {formatNumeroRadicado(fila.nro_radicado, fila.año_radicado)}
+                            {formatNumeroRadicado(fila.año_radicado, fila.nro_radicado)}
                           </span>
                         </div>
                         <p className="text-[10px] text-slate-400 mt-0.5">{fila.hora_radicacion}</p>

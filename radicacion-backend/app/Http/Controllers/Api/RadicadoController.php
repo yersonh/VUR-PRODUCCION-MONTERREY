@@ -10,6 +10,7 @@ use App\Services\RadicadoService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
 class RadicadoController extends Controller
@@ -35,10 +36,91 @@ class RadicadoController extends Controller
     {
         $perPage = min((int) $request->integer('per_page', 20), 100);
 
-        $query = Radicado::with([
+        $query = $this->queryFiltrado($request)->with([
             'tercero', 'tipoCorrespondencia',
             'medioIngreso', 'estado', 'operador', 'documentos',
-        ])
+        ]);
+
+        $paginated = $query->paginate($perPage);
+
+        $items = $paginated->getCollection()->map(fn (Radicado $r) => [
+            'id'                              => $r->id,
+            'nro_radicado'                    => $r->nro_radicado,
+            'año_radicado'                    => $r->año_radicado,
+            'fecha_radicacion'                => $r->fecha_radicacion?->toDateString(),
+            'hora_radicacion'                 => $r->hora_radicacion,
+            'manejo'                          => $r->manejo,
+            'procedencia'                     => $r->procedencia,
+            'remitente_display'               => $this->service->nombreRemitente($r),
+            'tipo_correspondencia_descripcion'=> $r->tipoCorrespondencia?->descripcion,
+            'dependencia_destino_descripcion' => $this->service->dependenciaInfo($r->dependencia_destino_id)['descripcion'] ?? null,
+            'aux_descripcion'                 => $r->aux_descripcion,
+            'nombre_persona_empresa'          => $r->nombre_persona_empresa,
+            'estado_codigo'                   => $r->estado?->codigo,
+            'estado_descripcion'              => $r->estado?->descripcion,
+            'operador_nombre'                 => $r->operador?->name,
+            'tiene_pdf_entrada'               => $r->documentos->where('tipo', 'ENTRADA')->isNotEmpty(),
+            'tiene_pdf_salida'                => $r->documentos->where('tipo', 'SALIDA')->isNotEmpty(),
+        ]);
+
+        // Forma plana (current_page/last_page/total/per_page al mismo nivel que
+        // 'data'), igual que el resto de endpoints paginados del sistema — el
+        // frontend usa el mismo parsePaginated() en todos. Antes iba anidado
+        // bajo 'meta', lo que dejaba esos campos en undefined en el cliente
+        // (de ahí el "NaN-NaN de 0" y el warning de key en la paginación).
+        return response()->json([
+            'data'         => $items,
+            'current_page' => $paginated->currentPage(),
+            'last_page'    => $paginated->lastPage(),
+            'total'        => $paginated->total(),
+            'per_page'     => $paginated->perPage(),
+        ]);
+    }
+
+    // ── GET /radicados/export ───────────────────────────────────────
+    // CSV del listado que cumple los mismos filtros de la Bandeja de
+    // Radicados (nro/estado/fechas/remitente/tipo/dependencia/tabs).
+    public function export(Request $request): \Illuminate\Http\Response
+    {
+        $radicados = $this->queryFiltrado($request)
+            ->with(['tipoCorrespondencia', 'estado', 'operador'])
+            ->get();
+
+        $filas   = [];
+        $filas[] = ['Número', 'Fecha', 'Hora', 'Remitente', 'Tipo correspondencia', 'Dependencia destino', 'Estado', 'Operador'];
+
+        foreach ($radicados as $r) {
+            $filas[] = [
+                $r->numero_radicado,
+                optional($r->fecha_radicacion)->toDateString(),
+                $r->hora_radicacion,
+                $this->service->nombreRemitente($r),
+                $r->tipoCorrespondencia?->descripcion,
+                $this->service->dependenciaInfo($r->dependencia_destino_id)['descripcion'] ?? null,
+                $r->estado?->descripcion,
+                $r->operador?->name,
+            ];
+        }
+
+        $csv = implode("\n", array_map(
+            fn (array $fila) => implode(',', array_map(fn ($v) => '"'.str_replace('"', '""', (string) $v).'"', $fila)),
+            $filas
+        ));
+
+        return response(
+            "\xEF\xBB\xBF".$csv, // BOM UTF-8 para que Excel abra tildes bien
+            200,
+            [
+                'Content-Type'        => 'text/csv; charset=UTF-8',
+                'Content-Disposition' => 'attachment; filename="radicados.csv"',
+            ]
+        );
+    }
+
+    // ── Filtros compartidos entre index() y export() ───────────────
+    private function queryFiltrado(Request $request)
+    {
+        return Radicado::query()
         ->when($request->filled('nro_radicado'), function ($q) use ($request) {
             $val = $request->string('nro_radicado')->toString();
             // Soporta formato AAAA-NNNNNN o solo el número
@@ -103,41 +185,6 @@ class RadicadoController extends Controller
             });
         })
         ->orderBy('nro_radicado', 'desc');
-
-        $paginated = $query->paginate($perPage);
-
-        $items = $paginated->getCollection()->map(fn (Radicado $r) => [
-            'id'                              => $r->id,
-            'nro_radicado'                    => $r->nro_radicado,
-            'año_radicado'                    => $r->año_radicado,
-            'fecha_radicacion'                => $r->fecha_radicacion?->toDateString(),
-            'hora_radicacion'                 => $r->hora_radicacion,
-            'manejo'                          => $r->manejo,
-            'procedencia'                     => $r->procedencia,
-            'remitente_display'               => $this->service->nombreRemitente($r),
-            'tipo_correspondencia_descripcion'=> $r->tipoCorrespondencia?->descripcion,
-            'dependencia_destino_descripcion' => $this->service->dependenciaInfo($r->dependencia_destino_id)['descripcion'] ?? null,
-            'aux_descripcion'                 => $r->aux_descripcion,
-            'nombre_persona_empresa'          => $r->nombre_persona_empresa,
-            'estado_codigo'                   => $r->estado?->codigo,
-            'estado_descripcion'              => $r->estado?->descripcion,
-            'operador_nombre'                 => $r->operador?->name,
-            'tiene_pdf_entrada'               => $r->documentos->where('tipo', 'ENTRADA')->isNotEmpty(),
-            'tiene_pdf_salida'                => $r->documentos->where('tipo', 'SALIDA')->isNotEmpty(),
-        ]);
-
-        // Forma plana (current_page/last_page/total/per_page al mismo nivel que
-        // 'data'), igual que el resto de endpoints paginados del sistema — el
-        // frontend usa el mismo parsePaginated() en todos. Antes iba anidado
-        // bajo 'meta', lo que dejaba esos campos en undefined en el cliente
-        // (de ahí el "NaN-NaN de 0" y el warning de key en la paginación).
-        return response()->json([
-            'data'         => $items,
-            'current_page' => $paginated->currentPage(),
-            'last_page'    => $paginated->lastPage(),
-            'total'        => $paginated->total(),
-            'per_page'     => $paginated->perPage(),
-        ]);
     }
 
     // ── GET /radicados/{id} ────────────────────────────────────────
@@ -150,7 +197,39 @@ class RadicadoController extends Controller
     // ── POST /radicados ────────────────────────────────────────────
     public function store(Request $request): JsonResponse
     {
-        $data = $request->validate($this->reglasValidacion());
+        $validator = Validator::make($request->all(), $this->reglasValidacion());
+
+        // Solicitud Carta de Residencia (tipo_correspondencia_id fijo, ver
+        // 2026_07_12_000001_seed_tipo_correspondencia_carta_residencia.php)
+        // exige siempre el anexo de cédula de ciudadanía — sin esto el
+        // trámite no tiene con qué verificar la identidad del solicitante.
+        $validator->after(function ($validator) use ($request) {
+            $tipoResidenciaId  = (int) config('services.cdr.tipo_correspondencia_residencia_id');
+            $tipoAnexoCedulaId = (int) config('services.cdr.tipo_anexo_cedula_id');
+
+            if ((int) $request->input('tipo_correspondencia_id') !== $tipoResidenciaId) {
+                return;
+            }
+
+            // input() no trae el archivo (es un UploadedFile, no un valor de
+            // formulario normal) — hay que cruzar el índice con hasFile()
+            // para confirmar que además de la fila con tipo_id=cédula, se
+            // adjuntó de verdad un documento.
+            $tieneCedula = collect($request->input('anexos', []))
+                ->contains(fn ($a, $i) =>
+                    (int) ($a['tipo_id'] ?? 0) === $tipoAnexoCedulaId
+                    && $request->hasFile("anexos.{$i}.archivo")
+                );
+
+            if (! $tieneCedula) {
+                $validator->errors()->add(
+                    'anexos',
+                    'Para una Solicitud Carta de Residencia debe adjuntar la cédula de ciudadanía como anexo.'
+                );
+            }
+        });
+
+        $data = $validator->validate();
 
         // Las notificaciones (email al remitente, aviso al responsable, etc.)
         // se disparan dentro de RadicadoService::crear() — no duplicar aquí.
@@ -204,7 +283,7 @@ class RadicadoController extends Controller
             'anexos'               => ['required', 'array', 'min:1', 'max:20'],
             'anexos.*.descripcion' => ['required', 'string', 'max:150'],
             'anexos.*.tipo_id'     => ['nullable', 'integer', 'exists:tipos_anexo,id'],
-            'anexos.*.archivo'     => ['nullable', 'file', 'mimes:pdf', 'max:20480'],
+            'anexos.*.archivo'     => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:20480'],
         ]);
 
         $radicado    = Radicado::findOrFail($id);
@@ -355,7 +434,7 @@ class RadicadoController extends Controller
             'anexos'                  => ['nullable', 'array', 'max:20'],
             'anexos.*.descripcion'    => ['required_with:anexos', 'string', 'max:150'],
             'anexos.*.tipo_id'        => ['nullable', 'integer', 'exists:tipos_anexo,id'],
-            'anexos.*.archivo'        => ['nullable', 'file', 'mimes:pdf', 'max:20480'],
+            'anexos.*.archivo'        => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:20480'],
             'fecha_documento'         => ['nullable', 'date'],
             'fecha_entrega'           => ['nullable', 'date'],
             'medio_ingreso_id'        => ['nullable', 'integer', 'exists:medios_ingreso,id'],
@@ -389,7 +468,7 @@ class RadicadoController extends Controller
             'tipo_correspondencia' => $r->tipoCorrespondencia,
             'aux_tip'              => $r->auxTip,
             'aux_descripcion'      => $r->aux_descripcion,
-            'fecha_limite'         => $r->fecha_limite?->toDateString(),
+            'fecha_limite'         => $r->fecha_limite?->toIso8601String(),
             'tipo_destino'         => $r->tipo_destino,
             'dependencia_destino'  => $this->service->dependenciaInfo($r->dependencia_destino_id),
             'personal_destino'     => $this->service->funcionarioInfo($r->personal_destino_id),
@@ -402,7 +481,7 @@ class RadicadoController extends Controller
             'otro_anexo'           => $r->otro_anexo,
             'anexos'               => $r->anexos ?? [],
             'fecha_documento'      => $r->fecha_documento?->toDateString(),
-            'fecha_entrega'        => $r->fecha_entrega?->toDateString(),
+            'fecha_entrega'        => $r->fecha_entrega?->toIso8601String(),
             'medio_ingreso'        => $r->medioIngreso,
             'observaciones'        => $r->observaciones,
             'ia_procesado'         => $r->ia_procesado,

@@ -8,6 +8,7 @@ export interface User {
   dependencia?: Dependencia
   funcionario_id?: number | null
   funcionario_nombre?: string | null
+  cargo?: string | null
   activo: boolean
   tiene_foto?: boolean
   debe_cambiar_password?: boolean
@@ -23,6 +24,8 @@ export interface Dependencia {
   id: number
   descripcion: string
   activo: boolean
+  lider_id?: number | null
+  lider_nombre?: string | null
 }
 
 export interface Personal {

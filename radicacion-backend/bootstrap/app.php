@@ -22,9 +22,10 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Alias de middlewares personalizados
         $middleware->alias([
-            'admin'       => \App\Http\Middleware\EnsureAdmin::class,
-            'password.ok' => \App\Http\Middleware\EnsureNoDebePasswordChange::class,
-            'cdr.token'   => \App\Http\Middleware\EnsureCdrServiceToken::class,
+            'admin'           => \App\Http\Middleware\EnsureAdmin::class,
+            'no-funcionario'  => \App\Http\Middleware\EnsureNotFuncionario::class,
+            'password.ok'     => \App\Http\Middleware\EnsureNoDebePasswordChange::class,
+            'cdr.token'       => \App\Http\Middleware\EnsureCdrServiceToken::class,
         ]);
     })
     ->withSchedule(function (Schedule $schedule): void {

@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\DependenciaLider;
 use App\Services\ClienteCore;
+use App\Services\RadicadoService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -12,7 +14,7 @@ class DependenciaAdminController extends Controller
 {
     protected ClienteCore $core;
 
-    public function __construct(ClienteCore $core)
+    public function __construct(ClienteCore $core, private RadicadoService $service)
     {
         $this->core = $core;
     }
@@ -38,8 +40,12 @@ class DependenciaAdminController extends Controller
 
         $pagina = $todas->slice(($page - 1) * $perPage, $perPage)->values();
 
+        $lideres = DependenciaLider::whereIn('dependencia_id', $pagina->pluck('id'))
+            ->get()
+            ->keyBy('dependencia_id');
+
         return response()->json([
-            'data'         => $pagina->map(fn (array $d) => $this->aFila($d)),
+            'data'         => $pagina->map(fn (array $d) => $this->aFila($d, $lideres->get($d['id']))),
             'current_page' => $page,
             'last_page'    => (int) max(1, ceil($todas->count() / $perPage)),
             'total'        => $todas->count(),
@@ -80,12 +86,16 @@ class DependenciaAdminController extends Controller
         ], 501);
     }
 
-    private function aFila(array $dependencia): array
+    private function aFila(array $dependencia, ?DependenciaLider $lider = null): array
     {
+        $liderInfo = $lider ? $this->service->funcionarioInfo($lider->funcionario_id) : null;
+
         return [
-            'id'          => $dependencia['id'],
-            'descripcion' => $dependencia['nombre'],
-            'activo'      => $dependencia['activo'] ?? true,
+            'id'           => $dependencia['id'],
+            'descripcion'  => $dependencia['nombre'],
+            'activo'       => $dependencia['activo'] ?? true,
+            'lider_id'     => $lider?->funcionario_id,
+            'lider_nombre' => $liderInfo['nombre_completo'] ?? null,
         ];
     }
 }

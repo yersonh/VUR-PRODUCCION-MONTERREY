@@ -166,7 +166,7 @@ class SolicitudCartaResidenciaController extends Controller
                 'folios_de'                => $paginas,
                 'medio_ingreso_id'         => $medioIngresoWeb?->id,
                 'fecha_documento'          => now()->toDateString(),
-                'fecha_entrega'            => now()->toDateString(),
+                'fecha_entrega'            => now()->toDateTimeString(),
             ],
             operadorId: $operador->id,
             pdfEntrada: $request->file('pdf_solicitud'),
@@ -228,8 +228,12 @@ class SolicitudCartaResidenciaController extends Controller
         // dispara sus propias notificaciones (más específicas que el aviso
         // genérico de cambiarEstado()) — por eso no se llama a cambiarEstado()
         // aparte en este caso, se duplicaría la notificación.
+        //
+        // estamparQr: false — este certificado ya viene firmado y con su
+        // propio QR de verificación generado por CDR; estampar el QR de VUR
+        // encima duplicaba el QR en el documento final entregado al ciudadano.
         if ($data['estado'] === 'RESPONDIDO' && $request->hasFile('documento_respuesta')) {
-            $this->service->adjuntarPdfSalida($radicado, $request->file('documento_respuesta'), $operador->id);
+            $this->service->adjuntarPdfSalida($radicado, $request->file('documento_respuesta'), $operador->id, estamparQr: false);
         } else {
             $this->service->cambiarEstado(
                 radicado:     $radicado,

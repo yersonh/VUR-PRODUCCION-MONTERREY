@@ -17,11 +17,19 @@ import { PDFUploader } from '@/components/ui/PDFUploader'
 import { IABanner, type CampoAplicado } from '@/components/ui/IABanner'
 import { PlazoTimeline } from '@/components/ui/PlazoTimeline'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { AlertDialog } from '@/components/ui/AlertDialog'
+import { ProgressModal } from '@/components/ui/ProgressModal'
 import { EstadoBadge } from '@/components/ui/EstadoBadge'
 import { useRadicadoForm } from '@/hooks/useRadicadoForm'
 import { useCatalogoStore } from '@/store/catalogoStore'
 import { useAuthStore } from '@/store/authStore'
 import { cn } from '@/lib/utils'
+
+// ids fijos sembrados por el backend — ver
+// 2026_07_12_000001_seed_tipo_correspondencia_carta_residencia.php y
+// 2026_07_20_000001_seed_tipo_anexo_cedula.php.
+const TIPO_CORRESPONDENCIA_RESIDENCIA_ID = 90
+const TIPO_ANEXO_CEDULA_ID = 100
 
 // ── Modales abiertos ───────────────────────────────────────────────
 type ModalKey =
@@ -123,6 +131,14 @@ export default function RadicadoNuevo() {
   const [confirmCancelar, setConfirmCancelar] = useState(false)
   const [terceroNoRegistrado, setTerceroNoRegistrado] = useState<IACamposSugeridos | null>(null)
   const [funcionarioNoRegistrado, setFuncionarioNoRegistrado] = useState<IACamposSugeridos | null>(null)
+  // Número de identificación del tercero (ciudadano/empresa) seleccionado como
+  // remitente — usado para validar el anexo de cédula en Solicitud Carta de
+  // Residencia (ver validarCedulaAnexo más abajo).
+  const [terceroIdentificacion, setTerceroIdentificacion] = useState<string | null>(null)
+  const [cedulaAnexoEstado, setCedulaAnexoEstado] = useState<{ ok: boolean; detectado: string | null } | null>(null)
+  const [validandoCedulaAnexo, setValidandoCedulaAnexo] = useState(false)
+  const [progresoCedulaAnexo, setProgresoCedulaAnexo] = useState(0)
+  const [cedulaMismatchModal, setCedulaMismatchModal] = useState<{ detectado: string | null; esperado: string; error?: string } | null>(null)
 
   // Modal crear tercero — solo aplica al remitente (el destino siempre es una dependencia)
   const [creandoTerceroCtx, setCreandoTerceroCtx] = useState<'remitente' | null>(null)
@@ -312,6 +328,8 @@ export default function RadicadoNuevo() {
     setValue('nombre_persona_empresa', '')
     setDisplayField({ descripcionRemitente: String(row.razon_social ?? row.nombre_completo ?? '') })
     setTerceroNoRegistrado(null)
+    setTerceroIdentificacion(row.nit ? String(row.nit) : null)
+    setCedulaAnexoEstado(null)
     if (watch('tipo_remitente') === 'TERCERO_NIT') cargarContactosEmpresa(id)
     else setContactosEmpresa([])
   }
@@ -323,6 +341,8 @@ export default function RadicadoNuevo() {
     setTerceroRows([{ id: t.id, nit: t.nit, razon_social: t.razon_social, municipio: t.municipio ?? '' }])
     if (nombreContacto) setValue('nombre_persona_empresa', nombreContacto)
     setTerceroNoRegistrado(null)
+    setTerceroIdentificacion(t.nit ?? null)
+    setCedulaAnexoEstado(null)
     if (watch('tipo_remitente') === 'TERCERO_NIT') cargarContactosEmpresa(t.id)
   }
 
@@ -338,6 +358,28 @@ export default function RadicadoNuevo() {
     if (dep) {
       setValue('dependencia_remitente_id', dep.id)
       setDisplayField({ descripcionDepRemitente: dep.descripcion })
+    }
+  }
+
+  // Si la dependencia tiene un líder asignado (admin > Funcionarios), se
+  // autocompleta como responsable por defecto — el líder es directamente el
+  // responsable de lo que llega a su dependencia. Se busca por id exacto
+  // (GET /personal/{id}) en vez de por listado filtrado por dependencia_id
+  // porque el Core no soporta ese filtro server-side y el líder podría no
+  // aparecer en una página parcial (ver PersonalController.php).
+  const autocompletarResponsablePorLider = async (dependenciaId: number) => {
+    const dep = dependencias.find(d => d.id === dependenciaId)
+    if (!dep?.lider_id) return
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL ?? '/api/v1'}/personal/${dep.lider_id}`, {
+        headers: { Authorization: `Bearer ${useAuthStore.getState().token ?? ''}` },
+      })
+      if (!res.ok) return
+      const data = await res.json()
+      setValue('personal_destino_id', data.id)
+      setDisplayField({ responsable: data.nombre_completo })
+    } catch {
+      // silencioso — el operador puede buscar el responsable manualmente
     }
   }
 
@@ -361,9 +403,24 @@ export default function RadicadoNuevo() {
       if (tc?.dependencia_destino_id) {
         setValue('dependencia_destino_id', tc.dependencia_destino_id)
         setDisplayField({ descripcionDepDestino: tc.dependencia_destino_descripcion ?? '' })
+        autocompletarResponsablePorLider(tc.dependencia_destino_id)
       } else {
         setValue('dependencia_destino_id', null)
         setDisplayField({ descripcionDepDestino: '' })
+      }
+    }
+
+    // Solicitud Carta de Residencia exige el anexo de cédula — se agrega
+    // automáticamente la fila para que el operador no tenga que crearla a
+    // mano y adivinar el tipo de anexo correcto.
+    if (Number(row.id) === TIPO_CORRESPONDENCIA_RESIDENCIA_ID) {
+      setTieneAnexos(true)
+      const yaTieneCedula = anexosItems.some(a => a.tipo_id === TIPO_ANEXO_CEDULA_ID)
+      if (!yaTieneCedula) {
+        syncAnexos([
+          ...anexosItems,
+          { descripcion: 'Cédula de ciudadanía', tipo_id: TIPO_ANEXO_CEDULA_ID, archivo: null },
+        ])
       }
     }
   }
@@ -378,6 +435,7 @@ export default function RadicadoNuevo() {
     setValue('dependencia_destino_id', Number(row.id))
     setValue('personal_destino_id', null)
     setDisplayField({ descripcionDepDestino: String(row.descripcion ?? ''), responsable: '' })
+    autocompletarResponsablePorLider(Number(row.id))
   }
 
   const selectPersonalDestino = (row: SearchRow) => {
@@ -437,7 +495,7 @@ export default function RadicadoNuevo() {
 
     const autoSelect = (rows: TerceroRow[], camposIA: IACamposSugeridos) => {
       const t = rows[0]
-      selectTercero({ id: t.id, razon_social: t.razon_social, nombre_completo: t.razon_social })
+      selectTercero({ id: t.id, razon_social: t.razon_social, nombre_completo: t.razon_social, nit: t.nit })
       setTerceroRows(rows.map(r => ({ id: r.id, nit: r.nit, razon_social: r.razon_social, municipio: r.municipio ?? '' })))
       // Si es empresa (NIT), pre-llenar responsable con nombre del firmante
       if (camposIA.tipo_remitente_sugerido === 'EMPRESA' && camposIA.nombre_remitente) {
@@ -656,11 +714,92 @@ export default function RadicadoNuevo() {
   }
 
   // ── Submit ─────────────────────────────────────────────────────────
+  // Lee el número de cédula del anexo (vía IA) y lo compara contra el
+  // ciudadano seleccionado como remitente. Solo aplica en Solicitud Carta de
+  // Residencia — ese trámite exige verificar que quien solicita es quien
+  // aparece en el documento adjunto.
+  const validarCedulaAnexo = async (archivo: File) => {
+    if (!terceroIdentificacion) return
+    setValidandoCedulaAnexo(true)
+    setCedulaAnexoEstado(null)
+    setProgresoCedulaAnexo(4)
+
+    // Progreso animado tipo "ease-out": avanza rápido al inicio y se va
+    // frenando a medida que se acerca a un techo del 92% sin llegar a
+    // completarlo por sí solo — así nunca hay un salto brusco de "vacío" a
+    // "lleno" sin importar si Gemini tarda más o menos de lo esperado.
+    // TAU_MS es la constante de tiempo de la curva (a los X ms alcanza
+    // ~63% del techo); se ajustó a la latencia típica de una llamada de
+    // Gemini sin reintentos.
+    const inicio = performance.now()
+    const TECHO_PROGRESO = 92
+    const TAU_MS = 4500
+    const interval = setInterval(() => {
+      const elapsed = performance.now() - inicio
+      setProgresoCedulaAnexo(TECHO_PROGRESO * (1 - Math.exp(-elapsed / TAU_MS)))
+    }, 80)
+
+    try {
+      const formData = new FormData()
+      formData.append('archivo', archivo)
+      const res = await fetch(`${import.meta.env.VITE_API_URL ?? '/api/v1'}/ia/analizar-cedula-anexo`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${useAuthStore.getState().token ?? ''}` },
+        body: formData,
+      })
+      const data = await res.json()
+      const esperado = terceroIdentificacion.replace(/\D/g, '')
+
+      // Si el backend no pudo llegar a analizar el documento (cuota de
+      // Gemini agotada, timeout, error de API), data.message trae el motivo
+      // real — no hay que confundirlo con "el documento no es legible", que
+      // es una conclusión distinta (la IA sí corrió, pero no vio el número).
+      if (!res.ok && data.message) {
+        setCedulaAnexoEstado(null)
+        setCedulaMismatchModal({ detectado: null, esperado, error: data.message })
+        return
+      }
+
+      const detectado = data.nro_identificacion ? String(data.nro_identificacion).replace(/\D/g, '') : null
+      const ok = detectado != null && detectado !== '' && detectado === esperado
+      setCedulaAnexoEstado({ ok, detectado })
+      if (!ok) {
+        setCedulaMismatchModal({ detectado, esperado })
+      }
+    } catch {
+      setCedulaAnexoEstado(null)
+      setCedulaMismatchModal({ detectado: null, esperado: terceroIdentificacion.replace(/\D/g, ''), error: 'No se pudo conectar con el servicio de validación.' })
+    } finally {
+      clearInterval(interval)
+      setProgresoCedulaAnexo(100)
+      await new Promise(r => setTimeout(r, 350))
+      setValidandoCedulaAnexo(false)
+      setProgresoCedulaAnexo(0)
+    }
+  }
+
   const enviarRadicado = async (values: import('@/hooks/useRadicadoForm').RadicadoFormValues) => {
     // Evita duplicados: el botón "Confirmar y Radicar" del modal de revisión
     // IA no pasa por handleSubmit() de react-hook-form, así que no queda
     // protegido por isSubmitting — un doble clic ahí disparaba dos POST.
     if (enviandoRef.current) return
+
+    if (values.tipo_correspondencia_id === TIPO_CORRESPONDENCIA_RESIDENCIA_ID) {
+      const tieneCedula = anexosItems.some(a => a.tipo_id === TIPO_ANEXO_CEDULA_ID && a.archivo != null)
+      if (!tieneCedula) {
+        toast.error('Para una Solicitud Carta de Residencia debe adjuntar la cédula de ciudadanía como anexo.')
+        return
+      }
+      if (validandoCedulaAnexo) {
+        toast.error('Espera a que termine de validarse el número de cédula del anexo.')
+        return
+      }
+      if (cedulaAnexoEstado && !cedulaAnexoEstado.ok) {
+        toast.error('El número de cédula del anexo no coincide con el del ciudadano. Corrígelo antes de radicar.')
+        return
+      }
+    }
+
     enviandoRef.current = true
     setEnviandoRadicado(true)
     try {
@@ -1018,7 +1157,7 @@ export default function RadicadoNuevo() {
                     required
                     error={errors.tercero_id?.message}
                     onSearch={() => setModalAbierto('tercero')}
-                    onClear={() => { setValue('tercero_id', null); setValue('nombre_persona_empresa', ''); setDisplayField({ descripcionRemitente: '' }); setContactosEmpresa([]) }}
+                    onClear={() => { setValue('tercero_id', null); setValue('nombre_persona_empresa', ''); setDisplayField({ descripcionRemitente: '' }); setContactosEmpresa([]); setTerceroIdentificacion(null); setCedulaAnexoEstado(null) }}
                     className="lg:col-span-2"
                   />
                 )}
@@ -1358,7 +1497,7 @@ export default function RadicadoNuevo() {
                     <button
                       type="button"
                       onClick={() => syncAnexos([...anexosItems, { descripcion: '', tipo_id: null, archivo: null }])}
-                      className="text-xs text-[#C8A800] hover:text-[#0B1220] font-medium flex items-center gap-1 transition-colors"
+                      className="text-xs text-[#0B1220] hover:text-[#C8A800] font-bold flex items-center gap-1 transition-colors"
                     >
                       + Agregar anexo
                     </button>
@@ -1390,9 +1529,19 @@ export default function RadicadoNuevo() {
                           <select
                             value={item.tipo_id ?? ''}
                             onChange={e => {
+                              const tipoId = e.target.value ? Number(e.target.value) : null
                               const updated = [...anexosItems]
-                              updated[idx] = { ...updated[idx], tipo_id: e.target.value ? Number(e.target.value) : null }
+                              updated[idx] = { ...updated[idx], tipo_id: tipoId }
                               syncAnexos(updated)
+                              if (
+                                tipoId === TIPO_ANEXO_CEDULA_ID
+                                && updated[idx].archivo
+                                && watch('tipo_correspondencia_id') === TIPO_CORRESPONDENCIA_RESIDENCIA_ID
+                              ) {
+                                validarCedulaAnexo(updated[idx].archivo)
+                              } else {
+                                setCedulaAnexoEstado(null)
+                              }
                             }}
                             className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800] text-slate-600"
                           >
@@ -1403,10 +1552,20 @@ export default function RadicadoNuevo() {
                           </select>
                           <input
                             type="file"
-                            accept="application/pdf"
+                            accept="application/pdf,image/jpeg,image/png"
                             onChange={e => {
+                              const archivo = e.target.files?.[0] ?? null
                               const updated = [...anexosItems]
-                              updated[idx] = { ...updated[idx], archivo: e.target.files?.[0] ?? null }
+                              updated[idx] = { ...updated[idx], archivo }
+                              if (
+                                archivo
+                                && updated[idx].tipo_id === TIPO_ANEXO_CEDULA_ID
+                                && watch('tipo_correspondencia_id') === TIPO_CORRESPONDENCIA_RESIDENCIA_ID
+                              ) {
+                                validarCedulaAnexo(archivo)
+                              } else {
+                                setCedulaAnexoEstado(null)
+                              }
                               syncAnexos(updated)
                             }}
                             className="text-xs text-slate-500 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-blue-50 file:text-[#C8A800] hover:file:bg-blue-100"
@@ -1425,6 +1584,30 @@ export default function RadicadoNuevo() {
                       </div>
                     ))}
                   </div>
+
+                  {watch('tipo_correspondencia_id') === TIPO_CORRESPONDENCIA_RESIDENCIA_ID && (
+                    <>
+                      {validandoCedulaAnexo && (
+                        <p className="text-xs text-slate-500 flex items-center gap-1.5">
+                          <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                          </svg>
+                          Validando número de cédula del anexo...
+                        </p>
+                      )}
+                      {!validandoCedulaAnexo && cedulaAnexoEstado?.ok === true && (
+                        <p className="text-xs text-[#1F8C6F] font-medium">
+                          ✓ El número de cédula del anexo coincide con el ciudadano.
+                        </p>
+                      )}
+                      {!validandoCedulaAnexo && cedulaAnexoEstado?.ok === false && (
+                        <p className="text-xs text-red-600 font-medium">
+                          ⚠ El número de cédula del anexo{cedulaAnexoEstado.detectado ? ` (${cedulaAnexoEstado.detectado})` : ''} no coincide con el ciudadano. Corrígelo antes de radicar.
+                        </p>
+                      )}
+                    </>
+                  )}
                 </div>
               )}
 
@@ -1442,7 +1625,7 @@ export default function RadicadoNuevo() {
                 <div className="flex flex-col gap-0.5">
                   <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wide">Fecha Entrega</span>
                   <input
-                    type="date"
+                    type="datetime-local"
                     {...register('fecha_entrega')}
                     className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800]"
                   />
@@ -1682,6 +1865,28 @@ export default function RadicadoNuevo() {
         onSi={handleConfirmarIAYEnviar}
         onNo={() => { setConfirmIARevision(false); pendingValuesRef.current = null }}
         loadingSi={enviandoRadicado}
+      />
+
+      {/* ── Aviso: cédula del anexo no coincide con el ciudadano ──────── */}
+      <AlertDialog
+        open={cedulaMismatchModal != null}
+        title={cedulaMismatchModal?.error ? 'No se pudo validar la cédula' : 'La cédula del anexo no coincide'}
+        message={
+          cedulaMismatchModal?.error
+            ? `El servicio de validación no pudo procesar el documento (${cedulaMismatchModal.error}). Vuelve a seleccionar el archivo del anexo para reintentar antes de radicar.`
+            : cedulaMismatchModal?.detectado
+              ? `El anexo tiene el número ${cedulaMismatchModal.detectado}, pero el ciudadano seleccionado como remitente tiene cédula ${cedulaMismatchModal.esperado}. Verifica el documento adjunto o el ciudadano seleccionado antes de radicar.`
+              : 'No se pudo leer el número de cédula en el documento adjunto. Verifica que la imagen o PDF sea legible antes de radicar.'
+        }
+        onOk={() => setCedulaMismatchModal(null)}
+      />
+
+      {/* ── Validando cédula del anexo por IA — bloquea toda la pantalla ── */}
+      <ProgressModal
+        open={validandoCedulaAnexo}
+        title="Validando cédula del anexo"
+        message="Estamos verificando que el número de cédula del documento coincida con el ciudadano. No cierres esta ventana."
+        progress={progresoCedulaAnexo}
       />
     </AppLayout>
   )

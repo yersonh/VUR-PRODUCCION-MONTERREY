@@ -4,7 +4,7 @@ import {
   HomeIcon, InboxArrowDownIcon, MagnifyingGlassIcon,
   UsersIcon, BuildingOffice2Icon, DocumentTextIcon,
   UserGroupIcon, Cog8ToothIcon, IdentificationIcon,
-  BuildingOfficeIcon, ChartBarIcon,
+  BuildingOfficeIcon, ChartBarIcon, Squares2X2Icon,
 } from '@heroicons/react/24/outline'
 import { useAuthStore } from '@/store/authStore'
 import { cn } from '@/lib/utils'
@@ -32,6 +32,12 @@ const NAV_SECTIONS = [
     title: 'Principal',
     items: [
       { to: '/dashboard', icon: <HomeIcon className="w-4.5 h-4.5" />, label: 'Inicio' },
+      {
+        to: '/panel',
+        icon: <Squares2X2Icon className="w-4.5 h-4.5" />,
+        label: 'Dashboard',
+        ocultoParaFuncionario: true,
+      },
     ] as NavItem[],
   },
   {
@@ -180,8 +186,12 @@ function SidebarContent({ onNavigate }: { onNavigate: () => void }) {
               ) : user.name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()}
             </div>
             <div className="min-w-0">
-              <p className="text-white text-xs font-medium truncate">{user.name}</p>
-              <p className="text-blue-300/60 text-[10px] truncate">{user.role?.nombre}</p>
+              <p className="text-white text-sm font-medium truncate">{user.name}</p>
+              <p className="text-blue-300/60 text-[10px] truncate">
+                {isFuncionario && (user.cargo || user.dependencia)
+                  ? [user.cargo, user.dependencia?.descripcion].filter(Boolean).join(' · ')
+                  : user.role?.nombre}
+              </p>
             </div>
           </div>
         </div>

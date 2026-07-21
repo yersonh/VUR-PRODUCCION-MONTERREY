@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\DependenciaLider;
 use App\Models\User;
 use App\Services\ClienteCore;
 use Illuminate\Http\JsonResponse;
@@ -31,8 +32,13 @@ class PersonalAdminController extends Controller
 
         $idsPagina = collect($resultado['data'] ?? [])->pluck('id')->all();
         $idsConUsuario = User::whereIn('funcionario_id', $idsPagina)->pluck('funcionario_id')->all();
+        $idsLideres = DependenciaLider::whereIn('funcionario_id', $idsPagina)->pluck('funcionario_id')->all();
 
-        $data = collect($resultado['data'] ?? [])->map(fn (array $f) => $this->aFila($f, in_array($f['id'], $idsConUsuario)));
+        $data = collect($resultado['data'] ?? [])->map(fn (array $f) => $this->aFila(
+            $f,
+            in_array($f['id'], $idsConUsuario),
+            in_array($f['id'], $idsLideres),
+        ));
 
         // NOTA: GET /funcionarios del Core solo documenta el filtro 'persona_id'.
         // No hay búsqueda por texto (q) ni filtro por dependencia_id soportados
@@ -92,7 +98,7 @@ class PersonalAdminController extends Controller
         $funcionario['persona']     ??= $datosPersona;
         $funcionario['dependencia'] ??= collect($this->core->dependencias())->firstWhere('id', $data['dependencia_id']);
 
-        return response()->json($this->aFila($funcionario), 201);
+        return response()->json($this->aFila($funcionario, false, $this->esLiderDeSuDependencia($funcionario)), 201);
     }
 
     public function update(Request $request, int $personal): JsonResponse
@@ -129,7 +135,16 @@ class PersonalAdminController extends Controller
         $funcionario['persona']     = $this->core->persona($personaId);
         $funcionario['dependencia'] = collect($this->core->dependencias())->firstWhere('id', $data['dependencia_id']);
 
-        return response()->json($this->aFila($funcionario));
+        $idsConUsuario = User::where('funcionario_id', $personal)->exists();
+
+        return response()->json($this->aFila($funcionario, $idsConUsuario, $this->esLiderDeSuDependencia($funcionario)));
+    }
+
+    private function esLiderDeSuDependencia(array $funcionario): bool
+    {
+        return DependenciaLider::where('dependencia_id', $funcionario['dependencia_id'])
+            ->where('funcionario_id', $funcionario['id'])
+            ->exists();
     }
 
     public function toggleActivo(int $personal): JsonResponse
@@ -142,7 +157,7 @@ class PersonalAdminController extends Controller
         ], 501);
     }
 
-    private function aFila(array $funcionario, bool $tieneUsuario = false): array
+    private function aFila(array $funcionario, bool $tieneUsuario = false, bool $esLider = false): array
     {
         $persona     = $funcionario['persona'] ?? [];
         $dependencia = $funcionario['dependencia'] ?? null;
@@ -162,6 +177,7 @@ class PersonalAdminController extends Controller
                 'descripcion' => $dependencia['nombre'],
                 'activo'      => $dependencia['activo'] ?? true,
             ] : null,
+            'es_lider'       => $esLider,
             'activo'         => $funcionario['activo'] ?? true,
             'tiene_usuario'  => $tieneUsuario,
         ];
