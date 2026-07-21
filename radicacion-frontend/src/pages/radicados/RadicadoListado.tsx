@@ -297,7 +297,11 @@ export default function RadicadoListado() {
 
         {/* ── Filtros avanzados ──────────────────────────────────── */}
         {mostrarFiltros && (
-          <div className="bg-white/90 backdrop-blur-sm border border-slate-200 rounded-2xl p-4 shadow-sm">
+          // relative z-20: el backdrop-blur de este panel y el de la tabla de
+          // abajo crean cada uno su propio stacking context; sin z-index
+          // explícito, la tabla (más abajo en el DOM) pintaría encima del
+          // dropdown del buscador de tipo de correspondencia.
+          <div className="relative z-20 bg-white/90 backdrop-blur-sm border border-slate-200 rounded-2xl p-4 shadow-sm">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <div className="flex flex-col gap-0.5">
                 <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wide">Fecha desde</span>
