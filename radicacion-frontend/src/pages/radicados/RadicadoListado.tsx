@@ -12,6 +12,7 @@ import { es } from 'date-fns/locale'
 
 import { AppLayout } from '@/components/layout/AppLayout'
 import { EstadoBadge } from '@/components/ui/EstadoBadge'
+import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { useCatalogoStore } from '@/store/catalogoStore'
 import { useAuthStore } from '@/store/authStore'
 import { formatNumeroRadicado } from '@/lib/utils'
@@ -329,16 +330,13 @@ export default function RadicadoListado() {
               </div>
               <div className="flex flex-col gap-0.5">
                 <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wide">Tipo correspondencia</span>
-                <select
-                  value={filtros.tipo_correspondencia_id ?? ''}
-                  onChange={e => setFiltro('tipo_correspondencia_id', e.target.value ? Number(e.target.value) : undefined)}
-                  className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800]"
-                >
-                  <option value="">Todos</option>
-                  {tiposCorrespondencia.map(t => (
-                    <option key={t.id} value={t.id}>{t.descripcion}</option>
-                  ))}
-                </select>
+                <SearchableSelect
+                  value={filtros.tipo_correspondencia_id}
+                  onChange={v => setFiltro('tipo_correspondencia_id', v ? Number(v) : undefined)}
+                  options={tiposCorrespondencia.map(t => ({ value: t.id, label: t.descripcion }))}
+                  placeholder="Buscar tipo..."
+                  allLabel="Todos"
+                />
               </div>
               <div className="flex flex-col gap-0.5">
                 <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wide">Dependencia destino</span>
