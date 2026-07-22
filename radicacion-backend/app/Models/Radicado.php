@@ -21,7 +21,7 @@ class Radicado extends Model
         'tipo_destino', 'tercero_destino_id', 'nombre_persona_destino',
         'folios', 'folios_de', 'cantidad_anexos', 'tipo_anexo_id', 'otro_anexo', 'anexos',
         'fecha_documento', 'fecha_entrega',
-        'medio_ingreso_id', 'observaciones', 'referencia_cdr',
+        'medio_ingreso_id', 'observaciones', 'referencia_cdr', 'codigo_seguimiento_cdr',
         'ia_procesado', 'ia_campos_sugeridos',
         'estado_id', 'operador_id',
     ];

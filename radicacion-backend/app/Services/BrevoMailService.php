@@ -44,7 +44,8 @@ class BrevoMailService
         string $dependenciaDestino,
         ?string $fechaLimite = null,
         ?string $responsable = null,
-        ?int $radicadoId = null
+        ?int $radicadoId = null,
+        ?string $codigoSeguimientoCdr = null
     ): bool {
         if (empty($this->apiKey) || empty($destinatarioEmail)) {
             return false;
@@ -54,16 +55,24 @@ class BrevoMailService
             .$this->campo('Tipo de correspondencia', $tipoCorrespondencia, true)
             .$this->campo('Dependencia destino', $dependenciaDestino)
             .($responsable ? $this->campo('Responsable de la respuesta', $responsable, true) : '')
-            .($fechaLimite ? $this->campo('Plazo de respuesta', $fechaLimite, false, self::COLOR_ALERTA) : '');
+            .($fechaLimite ? $this->campo('Plazo de respuesta', $fechaLimite, false, self::COLOR_ALERTA) : '')
+            .($codigoSeguimientoCdr ? $this->campo('Código de seguimiento', $codigoSeguimientoCdr, true) : '');
 
-        // Sin botón: este correo va al remitente (ciudadano/empresa/funcionario
-        // externo), que no tiene cuenta en VUR — un link a /radicados/{id}
-        // solo lo mandaría a la pantalla de login sin forma de entrar.
+        // Sin botón en general: este correo va al remitente (ciudadano/empresa/
+        // funcionario externo), que no tiene cuenta en VUR — un link a
+        // /radicados/{id} solo lo mandaría a la pantalla de login sin forma de
+        // entrar. Excepción: cuando trae codigoSeguimientoCdr (exclusivo de
+        // Solicitud Carta de Residencia, ver RadicadoService::crear), sí existe
+        // un portal público sin login en CDR donde consultarlo con ese código.
         $contenido = $this->saludo($destinatarioNombre)
             ."<p style='margin:0 0 4px'>Le confirmamos que su correspondencia fue registrada exitosamente en el sistema, bajo el siguiente número de radicado:</p>"
             .$this->insignia($numeroRadicado, self::COLOR_ACENTO)
             ."<table style='width:100%;border-collapse:collapse;border:1px solid ".self::COLOR_BORDE.";border-radius:10px;overflow:hidden'>{$ficha}</table>"
             ."<p style='margin:20px 0 0'>Le sugerimos conservar este número, ya que será su referencia para cualquier consulta posterior sobre el trámite.</p>"
+            .($codigoSeguimientoCdr && $this->urlConsultaCdr($codigoSeguimientoCdr)
+                ? "<p style='margin:16px 0 0'>Use el código de seguimiento para consultar el estado de su trámite en línea, en cualquier momento:</p>"
+                    .$this->boton('Consultar mi solicitud', $this->urlConsultaCdr($codigoSeguimientoCdr))
+                : '')
             .$this->firma();
 
         $html = $this->plantillaBase('Correspondencia radicada', self::COLOR_ACENTO, $contenido);
@@ -360,6 +369,21 @@ class BrevoMailService
         return $radicadoId
             ? $this->urlFrontend()."/radicados/{$radicadoId}"
             : $this->urlFrontend();
+    }
+
+    /**
+     * URL del portal público de CDR para consultar una Solicitud Carta de
+     * Residencia por su código de seguimiento (SP-########). Devuelve cadena
+     * vacía (falsy) si CDR_FRONTEND_URL no está configurada, para que el
+     * botón del correo se omita en vez de enlazar a algo roto.
+     */
+    private function urlConsultaCdr(string $codigoSeguimientoCdr): string
+    {
+        $base = rtrim((string) config('services.cdr.frontend_url'), '/');
+
+        return $base
+            ? $base.'/consultar-solicitud?referencia='.urlencode($codigoSeguimientoCdr)
+            : '';
     }
 
     // ── Plantilla compartida ────────────────────────────────────────

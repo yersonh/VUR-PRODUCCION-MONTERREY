@@ -150,6 +150,13 @@ class RadicadoService
             $nombreRemitente = $this->nombreRemitente($radicado);
 
             if ($emailRemitente) {
+                // El código de seguimiento (SP-########) y el botón para
+                // consultarlo solo aplican a Solicitud Carta de Residencia
+                // (el único tipo de correspondencia con portal público de
+                // consulta en CDR) — cualquier otro tipo de correspondencia
+                // no tiene ese código ni ese portal, así que no se envían.
+                $esResidenciaCdr = (int) $radicado->tipo_correspondencia_id === (int) config('services.cdr.tipo_correspondencia_residencia_id');
+
                 $this->brevo->enviarConfirmacionRadicado(
                     destinatarioEmail:      $emailRemitente,
                     destinatarioNombre:     $nombreRemitente,
@@ -160,6 +167,7 @@ class RadicadoService
                     fechaLimite:            $radicado->fecha_limite?->format('d/m/Y h:i A'),
                     responsable:            $responsableInfo['nombre_completo'] ?? null,
                     radicadoId:             $radicado->id,
+                    codigoSeguimientoCdr:   $esResidenciaCdr ? $radicado->codigo_seguimiento_cdr : null,
                 );
             }
 

@@ -55,6 +55,11 @@ return [
         // SolicitudCartaResidenciaController). Sembrado en la migración
         // 2026_07_11_120000_seed_cdr_sistema_user.php.
         'operador_email'                      => env('CDR_OPERADOR_EMAIL', 'sistema.cdr@monterrey.gov.co'),
+        // URL pública del frontend de CDR — se usa solo para armar el botón
+        // "Consultar mi solicitud" del correo de confirmación de radicado,
+        // cuando el radicado es una Solicitud Carta de Residencia (ver
+        // RadicadoService::crear() y BrevoMailService::enviarConfirmacionRadicado()).
+        'frontend_url'                        => env('CDR_FRONTEND_URL'),
     ],
     // ── Brevo (correos transaccionales vía API REST) ───────────────
     'brevo' => [

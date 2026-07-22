@@ -48,6 +48,12 @@ class SolicitudCartaResidenciaController extends Controller
             'tipo_certificado'       => ['required', 'in:general,estudios'],
             'medio_acreditacion'     => ['required', 'in:electoral,sisben,jac,especial'],
             'referencia_cdr'         => ['required', 'integer'],
+            // Código de seguimiento público (SP-########) que el ciudadano usa
+            // en el portal de CDR — se guarda estructurado para incluirlo en
+            // el correo de confirmación de radicado (ver RadicadoService::crear
+            // y BrevoMailService::enviarConfirmacionRadicado). Opcional para no
+            // romper la integración si CDR aún no lo envía.
+            'codigo_seguimiento_cdr' => ['nullable', 'string', 'max:20'],
         ]);
 
         $tipoCorrespondencia = TipoCorrespondencia::find(config('services.cdr.tipo_correspondencia_residencia_id'));
@@ -161,6 +167,7 @@ class SolicitudCartaResidenciaController extends Controller
                 'dependencia_destino_id'   => $tipoCorrespondencia->dependencia_destino_id,
                 'observaciones'            => $observaciones,
                 'referencia_cdr'           => (string) $data['referencia_cdr'],
+                'codigo_seguimiento_cdr'   => $data['codigo_seguimiento_cdr'] ?? null,
                 'anexos'                   => $anexos,
                 'folios'                   => $paginas,
                 'folios_de'                => $paginas,
