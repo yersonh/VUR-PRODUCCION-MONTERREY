@@ -51,6 +51,12 @@ class BrevoMailService
             return false;
         }
 
+        // TEMPORAL — prueba de control para descartar/confirmar si estas dos
+        // líneas (fila de código + botón) son la causa de que el correo caiga
+        // en spam. No borrar: revertir este comentario en cuanto se confirme
+        // el diagnóstico, ver conversación sobre spam del 2026-07-22.
+        $codigoSeguimientoCdr = null;
+
         $ficha = $this->campo('Fecha de radicación', $fechaRadicacion)
             .$this->campo('Tipo de correspondencia', $tipoCorrespondencia, true)
             .$this->campo('Dependencia destino', $dependenciaDestino)
