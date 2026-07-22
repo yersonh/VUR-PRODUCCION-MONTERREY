@@ -51,34 +51,38 @@ class BrevoMailService
             return false;
         }
 
-        // TEMPORAL — prueba de control para descartar/confirmar si estas dos
-        // líneas (fila de código + botón) son la causa de que el correo caiga
-        // en spam. No borrar: revertir este comentario en cuanto se confirme
-        // el diagnóstico, ver conversación sobre spam del 2026-07-22.
-        $codigoSeguimientoCdr = null;
-
         $ficha = $this->campo('Fecha de radicación', $fechaRadicacion)
             .$this->campo('Tipo de correspondencia', $tipoCorrespondencia, true)
             .$this->campo('Dependencia destino', $dependenciaDestino)
             .($responsable ? $this->campo('Responsable de la respuesta', $responsable, true) : '')
-            .($fechaLimite ? $this->campo('Plazo de respuesta', $fechaLimite, false, self::COLOR_ALERTA) : '')
-            .($codigoSeguimientoCdr ? $this->campo('Código de seguimiento', $codigoSeguimientoCdr, true) : '');
+            .($fechaLimite ? $this->campo('Plazo de respuesta', $fechaLimite, false, self::COLOR_ALERTA) : '');
+
+        // El código de seguimiento de CDR (SP-########) NO va en la ficha ni
+        // en un botón de llamada a la acción: probamos esa versión y causó
+        // que Brevo/Gmail marcaran el correo como spam — el patrón "fila
+        // destacada + palabra 'Código'" coincide con lo que los filtros
+        // antiphishing vigilan (correos de código de verificación). Va como
+        // texto corrido dentro del párrafo, y el enlace es un texto plano
+        // <a> normal en vez de un botón vistoso, para que no destaque como
+        // un patrón sospechoso.
+        $parrafoSeguimiento = '';
+        if ($codigoSeguimientoCdr) {
+            $urlConsulta = $this->urlConsultaCdr($codigoSeguimientoCdr);
+            $parrafoSeguimiento = $urlConsulta
+                ? "<p style='margin:16px 0 0'>Puede usar la referencia <strong>{$codigoSeguimientoCdr}</strong> para <a href='{$urlConsulta}' style='color:".self::COLOR_ACENTO."'>consultar el estado de su trámite en línea</a> en cualquier momento.</p>"
+                : "<p style='margin:16px 0 0'>Puede usar la referencia <strong>{$codigoSeguimientoCdr}</strong> para consultar el estado de su trámite en línea en cualquier momento.</p>";
+        }
 
         // Sin botón en general: este correo va al remitente (ciudadano/empresa/
         // funcionario externo), que no tiene cuenta en VUR — un link a
         // /radicados/{id} solo lo mandaría a la pantalla de login sin forma de
-        // entrar. Excepción: cuando trae codigoSeguimientoCdr (exclusivo de
-        // Solicitud Carta de Residencia, ver RadicadoService::crear), sí existe
-        // un portal público sin login en CDR donde consultarlo con ese código.
+        // entrar.
         $contenido = $this->saludo($destinatarioNombre)
             ."<p style='margin:0 0 4px'>Le confirmamos que su correspondencia fue registrada exitosamente en el sistema, bajo el siguiente número de radicado:</p>"
             .$this->insignia($numeroRadicado, self::COLOR_ACENTO)
             ."<table style='width:100%;border-collapse:collapse;border:1px solid ".self::COLOR_BORDE.";border-radius:10px;overflow:hidden'>{$ficha}</table>"
             ."<p style='margin:20px 0 0'>Le sugerimos conservar este número, ya que será su referencia para cualquier consulta posterior sobre el trámite.</p>"
-            .($codigoSeguimientoCdr && $this->urlConsultaCdr($codigoSeguimientoCdr)
-                ? "<p style='margin:16px 0 0'>Use el código de seguimiento para consultar el estado de su trámite en línea, en cualquier momento:</p>"
-                    .$this->boton('Consultar mi solicitud', $this->urlConsultaCdr($codigoSeguimientoCdr))
-                : '')
+            .$parrafoSeguimiento
             .$this->firma();
 
         $html = $this->plantillaBase('Correspondencia radicada', self::COLOR_ACENTO, $contenido);
