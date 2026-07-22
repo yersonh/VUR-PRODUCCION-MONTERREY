@@ -24,6 +24,7 @@ class RadicadoService
         private BrevoMailService     $brevo,
         private NotificacionService  $notificacion,
         private ClienteCore          $core,
+        private ClienteCdr           $cdr,
         private QrService            $qr,
     ) {}
 
@@ -150,12 +151,43 @@ class RadicadoService
             $nombreRemitente = $this->nombreRemitente($radicado);
 
             if ($emailRemitente) {
-                // El código de seguimiento (SP-########) y el botón para
+                // El código de seguimiento (SP-########) y el enlace para
                 // consultarlo solo aplican a Solicitud Carta de Residencia
                 // (el único tipo de correspondencia con portal público de
                 // consulta en CDR) — cualquier otro tipo de correspondencia
                 // no tiene ese código ni ese portal, así que no se envían.
                 $esResidenciaCdr = (int) $radicado->tipo_correspondencia_id === (int) config('services.cdr.tipo_correspondencia_residencia_id');
+
+                // Si esta Carta de Residencia la radicó directamente un
+                // operador de VUR (correo/ventanilla presencial) en vez de
+                // llegar ya con su código desde el intake de CDR
+                // (referencia_cdr vacío), le pedimos a CDR que la registre
+                // ahora para conseguir el mismo código SP-######## real y
+                // consultable que ya recibe quien usa el formulario web.
+                // Síncrono y best-effort: si CDR no responde, el radicado
+                // sigue su curso normal sin el código (ver ClienteCdr::
+                // registrarSolicitudResidencia).
+                if ($esResidenciaCdr && empty($radicado->referencia_cdr)) {
+                    $remitente = $this->terceroInfo($radicado->tercero);
+
+                    $resultado = $this->cdr->registrarSolicitudResidencia([
+                        'nombre_completo' => $remitente['nombre_completo'] ?? $radicado->nombre_persona_empresa,
+                        'tipo_documento' => $remitente['tipo_documento'] ?? null,
+                        'numero_identificacion' => $remitente['nro_identificacion'] ?? null,
+                        'direccion' => $remitente['direccion'] ?? null,
+                        'correo' => $remitente['email'] ?? null,
+                        'celular' => $remitente['telefono'] ?? null,
+                        'motivo' => $radicado->observaciones,
+                        'radicado_vur' => $radicado->numeroRadicado,
+                    ]);
+
+                    if ($resultado) {
+                        $radicado->update([
+                            'referencia_cdr' => (string) $resultado['referencia_cdr'],
+                            'codigo_seguimiento_cdr' => $resultado['codigo_seguimiento_cdr'],
+                        ]);
+                    }
+                }
 
                 $this->brevo->enviarConfirmacionRadicado(
                     destinatarioEmail:      $emailRemitente,
