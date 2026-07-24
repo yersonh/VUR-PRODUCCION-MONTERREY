@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CatalogoController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\IAController;
+use App\Http\Controllers\Api\ManualController;
 use App\Http\Controllers\Api\PersonalController;
 use App\Http\Controllers\Api\RadicadoController;
 use App\Http\Controllers\Api\TerceroController;
@@ -124,6 +125,9 @@ Route::prefix('v1')->group(function () {
             Route::patch('radicados/{id}/anular',      [RadicadoController::class, 'anular']);
             Route::get('radicados/{id}/pdf/{tipo}',    [RadicadoController::class, 'descargarPdf']);
             Route::get('radicados/{id}/documentos/{documentoId}', [RadicadoController::class, 'descargarDocumento']);
+
+            // Manual de usuario — cada rol descarga el suyo
+            Route::get('manuales/mio', [ManualController::class, 'descargarMio']);
 
             // ── Admin — solo rol ADMIN ───────────────────────────
             Route::middleware('admin')->prefix('admin')->group(function () {

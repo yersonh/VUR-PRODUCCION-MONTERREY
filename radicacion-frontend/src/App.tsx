@@ -7,6 +7,7 @@ import CambiarPassword from '@/pages/auth/CambiarPassword'
 const VerificarRespuesta = lazy(() => import('@/pages/VerificarRespuesta'))
 const Dashboard = lazy(() => import('@/pages/Dashboard'))
 const Panel = lazy(() => import('@/pages/Panel'))
+const Ayuda = lazy(() => import('@/pages/Ayuda'))
 const RadicadoNuevo = lazy(() => import('@/pages/radicados/RadicadoNuevo'))
 const RadicadoListado = lazy(() => import('@/pages/radicados/RadicadoListado'))
 const RadicadoDetalle = lazy(() => import('@/pages/radicados/RadicadoDetalle'))
@@ -141,6 +142,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <RadicadoDetalle />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ayuda"
+          element={
+            <ProtectedRoute>
+              <Ayuda />
             </ProtectedRoute>
           }
         />

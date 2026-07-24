@@ -5,6 +5,7 @@ import {
   UsersIcon, BuildingOffice2Icon, DocumentTextIcon,
   UserGroupIcon, Cog8ToothIcon, IdentificationIcon,
   BuildingOfficeIcon, ChartBarIcon, Squares2X2Icon,
+  QuestionMarkCircleIcon,
 } from '@heroicons/react/24/outline'
 import { useAuthStore } from '@/store/authStore'
 import { cn } from '@/lib/utils'
@@ -107,6 +108,16 @@ const NAV_SECTIONS = [
         icon: <Cog8ToothIcon className="w-4.5 h-4.5" />,
         label: 'Catálogos',
         adminOnly: true,
+      },
+    ] as NavItem[],
+  },
+  {
+    title: 'Ayuda',
+    items: [
+      {
+        to: '/ayuda',
+        icon: <QuestionMarkCircleIcon className="w-4.5 h-4.5" />,
+        label: 'Manual de Usuario',
       },
     ] as NavItem[],
   },

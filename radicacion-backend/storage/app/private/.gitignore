@@ -1,2 +1,7 @@
 *
 !.gitignore
+
+# Manuales de usuario: assets propios de la aplicación (no adjuntos de
+# radicados subidos por usuarios), deben viajar con el código en cada build.
+!manuales/
+!manuales/**
