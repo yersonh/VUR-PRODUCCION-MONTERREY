@@ -443,6 +443,7 @@ class RadicadoController extends Controller
             // Residencia — CDR lo necesita para formalizar el trámite
             // automáticamente y para imprimirlo en el certificado.
             'barrio_vereda_sector'    => ['nullable', 'string', 'max:255'],
+            'medio_acreditacion'      => ['nullable', 'string', 'in:electoral,sisben,jac'],
             'pdf_entrada'             => ['nullable', 'file', 'mimes:pdf', 'max:20480'],
             'pdf_salida'              => ['nullable', 'file', 'mimes:pdf', 'max:20480'],
         ];

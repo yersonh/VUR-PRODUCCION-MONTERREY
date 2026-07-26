@@ -45,6 +45,28 @@ class EnviarSolicitudResidenciaACdr implements ShouldQueue
 
         $remitente = $service->terceroInfo($radicado->tercero);
 
+        // Certificado Electoral es el único medio con soporte opcional en
+        // VUR (SISBEN/JAC no se adjuntan aquí, igual que en el formulario
+        // público de CDR) — si el operador lo agregó como anexo, se busca su
+        // documento para enviarlo junto con el recibido. Si no está, se
+        // manda sin soporte: CDR se encarga de pedir la subsanación (ver
+        // RecibidoVurService::procesarAutomaticamente en el repo CDR).
+        $rutaSoporteAbsoluta = null;
+        $nombreSoporte = null;
+        if ($radicado->medio_acreditacion === 'electoral') {
+            $tipoAnexoElectoralId = (int) config('services.cdr.tipo_anexo_certificado_electoral_id');
+            $anexoElectoral = collect($radicado->anexos ?? [])
+                ->first(fn (array $a) => (int) ($a['tipo_id'] ?? 0) === $tipoAnexoElectoralId && $a['documento_id']);
+
+            if ($anexoElectoral) {
+                $documentoElectoral = $radicado->documentos->firstWhere('id', $anexoElectoral['documento_id']);
+                if ($documentoElectoral) {
+                    $rutaSoporteAbsoluta = $pdfStorage->rutaAbsoluta($documentoElectoral->ruta_almacenamiento);
+                    $nombreSoporte = $documentoElectoral->nombre_original;
+                }
+            }
+        }
+
         try {
             $resultado = $cdr->enviarRecibido(
                 datos: [
@@ -57,9 +79,12 @@ class EnviarSolicitudResidenciaACdr implements ShouldQueue
                     'direccion'             => $remitente['direccion'] ?? null,
                     'tipo_documento'        => $remitente['tipo_documento'] ?? null,
                     'motivo'                => $radicado->observaciones,
+                    'medio_acreditacion'    => $radicado->medio_acreditacion,
                 ],
                 rutaPdfAbsoluta: $pdfStorage->rutaAbsoluta($documentoEntrada->ruta_almacenamiento),
                 nombreArchivo: $documentoEntrada->nombre_original,
+                rutaSoporteAbsoluta: $rutaSoporteAbsoluta,
+                nombreSoporte: $nombreSoporte,
             );
 
             // 409: CDR ya tenía este radicado_vur registrado — casi siempre

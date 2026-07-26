@@ -1626,6 +1626,32 @@ export default function RadicadoNuevo() {
                           <span className="text-[11px] text-red-600">{errors.barrio_vereda_sector.message}</span>
                         )}
                       </div>
+
+                      <div className="flex flex-col gap-0.5 max-w-sm">
+                        <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wide">
+                          Medio de acreditación
+                        </span>
+                        <select
+                          {...register('medio_acreditacion')}
+                          className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800] text-slate-600"
+                        >
+                          <option value="">Seleccione...</option>
+                          <option value="electoral">Certificado Electoral</option>
+                          <option value="sisben">Certificación de Antigüedad SISBEN</option>
+                          <option value="jac">Certificación Junta de Acción Comunal (JAC)</option>
+                        </select>
+                        {errors.medio_acreditacion?.message && (
+                          <span className="text-[11px] text-red-600">{errors.medio_acreditacion.message}</span>
+                        )}
+                      </div>
+
+                      {watch('medio_acreditacion') === 'electoral' && (
+                        <p className="text-xs text-slate-500 max-w-sm">
+                          El certificado electoral es opcional para radicar: puede adjuntarlo como anexo (tipo
+                          "Certificado Electoral") si lo tiene a mano. Si no lo adjunta, Secretaría en CDR le pedirá
+                          la subsanación al ciudadano más adelante.
+                        </p>
+                      )}
                     </>
                   )}
                 </div>

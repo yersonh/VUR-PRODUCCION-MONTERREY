@@ -23,13 +23,28 @@ class ClienteCdr
     // Envía un recibido a CDR (POST /v1/recibidos-vur). Un 409 significa que
     // CDR ya tenía este radicado_vur registrado (reintento del Job tras un
     // fallo transitorio) — se trata como éxito idempotente, no como error.
-    public function enviarRecibido(array $datos, string $rutaPdfAbsoluta, string $nombreArchivo): array
-    {
-        $response = Http::withToken($this->token)
+    public function enviarRecibido(
+        array $datos,
+        string $rutaPdfAbsoluta,
+        string $nombreArchivo,
+        ?string $rutaSoporteAbsoluta = null,
+        ?string $nombreSoporte = null,
+    ): array {
+        $request = Http::withToken($this->token)
             ->acceptJson()
             ->timeout(20)
-            ->attach('pdf', file_get_contents($rutaPdfAbsoluta), $nombreArchivo)
-            ->post("{$this->baseUrl}/v1/recibidos-vur", $datos);
+            ->attach('pdf', file_get_contents($rutaPdfAbsoluta), $nombreArchivo);
+
+        // Soporte de acreditación opcional (hoy solo aplica a Certificado
+        // Electoral) — si el operador lo adjuntó como anexo al radicar, se
+        // envía junto con el recibido para que CDR pueda auto-formalizar sin
+        // pedirle al ciudadano una subsanación (ver
+        // RecibidoVurService::procesarAutomaticamente en el repo CDR).
+        if ($rutaSoporteAbsoluta && $nombreSoporte) {
+            $request = $request->attach('soporte', file_get_contents($rutaSoporteAbsoluta), $nombreSoporte);
+        }
+
+        $response = $request->post("{$this->baseUrl}/v1/recibidos-vur", $datos);
 
         if ($response->status() === 409) {
             // WARNING (no INFO): esto no es un reintento inofensivo del Job —

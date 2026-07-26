@@ -179,6 +179,7 @@ class RadicadoService
                         'celular' => $remitente['telefono'] ?? null,
                         'motivo' => $radicado->observaciones,
                         'barrio_vereda_sector' => $radicado->barrio_vereda_sector,
+                        'medio_acreditacion' => $radicado->medio_acreditacion,
                         'radicado_vur' => $radicado->numeroRadicado,
                     ]);
 

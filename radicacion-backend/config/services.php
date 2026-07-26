@@ -50,6 +50,11 @@ return [
         // el anexo de cédula en el flujo de Solicitud Carta de Residencia
         // y para la validación IA del número de documento.
         'tipo_anexo_cedula_id'                => env('VUR_TIPO_ANEXO_CEDULA_ID', 100),
+        // Igual que arriba, pero para el soporte de Certificado Electoral
+        // (medio_acreditacion=electoral) — opcional, no bloquea el radicado
+        // si no se adjunta (ver RadicadoService::crear y
+        // EnviarSolicitudResidenciaACdr).
+        'tipo_anexo_certificado_electoral_id' => env('VUR_TIPO_ANEXO_CERTIFICADO_ELECTORAL_ID', 101),
         // Usuario "de sistema" que queda como operador_id de los radicados
         // creados automáticamente por el intake público de CDR (ver
         // SolicitudCartaResidenciaController). Sembrado en la migración

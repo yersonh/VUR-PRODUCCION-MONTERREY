@@ -35,6 +35,11 @@ const radicadoSchemaBase = z.object({
   // abajo) — CDR lo necesita para formalizar el trámite automáticamente y
   // para imprimirlo en el certificado ("...dirección, sector {valor}.").
   barrio_vereda_sector:    z.string().max(255).nullable(),
+  // Mismo concepto que el ciudadano elige en el formulario público de CDR —
+  // le permite a CDR enrutar el trámite al mismo flujo de validación
+  // (IA electoral / Funcionario SISBEN / Presidente JAC) sin importar si se
+  // radicó ahí o directo en VUR.
+  medio_acreditacion:      z.enum(['electoral', 'sisben', 'jac']).nullable(),
 })
 
 // id=90: Solicitud Carta De Residencia (mismo id fijo que
@@ -48,6 +53,9 @@ export const radicadoSchema = radicadoSchemaBase.superRefine((data, ctx) => {
   }
   if (data.tipo_correspondencia_id === TIPO_CORRESPONDENCIA_RESIDENCIA_ID && !data.barrio_vereda_sector?.trim()) {
     ctx.addIssue({ code: 'custom', path: ['barrio_vereda_sector'], message: 'Indique el barrio, vereda o sector del solicitante' })
+  }
+  if (data.tipo_correspondencia_id === TIPO_CORRESPONDENCIA_RESIDENCIA_ID && !data.medio_acreditacion) {
+    ctx.addIssue({ code: 'custom', path: ['medio_acreditacion'], message: 'Seleccione el medio de acreditación' })
   }
 })
 
@@ -102,6 +110,7 @@ const DEFAULT_VALUES: RadicadoFormValues = {
   nombre_persona_empresa:  null,
   observaciones:           null,
   barrio_vereda_sector:    null,
+  medio_acreditacion:      null,
 }
 
 export function useRadicadoForm() {
