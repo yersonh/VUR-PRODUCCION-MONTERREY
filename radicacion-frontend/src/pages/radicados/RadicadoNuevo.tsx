@@ -1610,6 +1610,22 @@ export default function RadicadoNuevo() {
                           ⚠ El número de cédula del anexo{cedulaAnexoEstado.detectado ? ` (${cedulaAnexoEstado.detectado})` : ''} no coincide con el ciudadano. Corrígelo antes de radicar.
                         </p>
                       )}
+
+                      <div className="flex flex-col gap-0.5 max-w-sm">
+                        <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wide">
+                          Barrio / Vereda / Sector
+                        </span>
+                        <input
+                          type="text"
+                          maxLength={255}
+                          placeholder="Ej: Barrio Centro"
+                          {...register('barrio_vereda_sector')}
+                          className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800]"
+                        />
+                        {errors.barrio_vereda_sector?.message && (
+                          <span className="text-[11px] text-red-600">{errors.barrio_vereda_sector.message}</span>
+                        )}
+                      </div>
                     </>
                   )}
                 </div>

@@ -31,11 +31,23 @@ const radicadoSchemaBase = z.object({
   medio_ingreso_id:        z.number().min(1, 'Seleccione un medio'),
   nombre_persona_empresa:  z.string().max(100).nullable(),
   observaciones:           z.string().max(5700).nullable(),
+  // Solo se exige para Solicitud Carta de Residencia (ver superRefine más
+  // abajo) — CDR lo necesita para formalizar el trámite automáticamente y
+  // para imprimirlo en el certificado ("...dirección, sector {valor}.").
+  barrio_vereda_sector:    z.string().max(255).nullable(),
 })
+
+// id=90: Solicitud Carta De Residencia (mismo id fijo que
+// TIPO_CORRESPONDENCIA_RESIDENCIA_ID en RadicadoNuevo.tsx — no se importa de
+// ahí para no crear una dependencia circular entre el hook y la página).
+const TIPO_CORRESPONDENCIA_RESIDENCIA_ID = 90
 
 export const radicadoSchema = radicadoSchemaBase.superRefine((data, ctx) => {
   if (!data.dependencia_destino_id) {
     ctx.addIssue({ code: 'custom', path: ['dependencia_destino_id'], message: 'Seleccione una dependencia' })
+  }
+  if (data.tipo_correspondencia_id === TIPO_CORRESPONDENCIA_RESIDENCIA_ID && !data.barrio_vereda_sector?.trim()) {
+    ctx.addIssue({ code: 'custom', path: ['barrio_vereda_sector'], message: 'Indique el barrio, vereda o sector del solicitante' })
   }
 })
 
@@ -89,6 +101,7 @@ const DEFAULT_VALUES: RadicadoFormValues = {
   medio_ingreso_id:        0,
   nombre_persona_empresa:  null,
   observaciones:           null,
+  barrio_vereda_sector:    null,
 }
 
 export function useRadicadoForm() {

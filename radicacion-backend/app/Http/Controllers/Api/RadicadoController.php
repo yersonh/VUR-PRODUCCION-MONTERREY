@@ -439,6 +439,10 @@ class RadicadoController extends Controller
             'fecha_entrega'           => ['nullable', 'date'],
             'medio_ingreso_id'        => ['nullable', 'integer', 'exists:medios_ingreso,id'],
             'observaciones'           => ['nullable', 'string', 'max:5700'],
+            // Solo se exige (en el frontend) para Solicitud Carta de
+            // Residencia — CDR lo necesita para formalizar el trámite
+            // automáticamente y para imprimirlo en el certificado.
+            'barrio_vereda_sector'    => ['nullable', 'string', 'max:255'],
             'pdf_entrada'             => ['nullable', 'file', 'mimes:pdf', 'max:20480'],
             'pdf_salida'              => ['nullable', 'file', 'mimes:pdf', 'max:20480'],
         ];
