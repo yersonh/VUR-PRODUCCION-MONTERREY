@@ -794,8 +794,12 @@ export default function RadicadoNuevo() {
         toast.error('Espera a que termine de validarse el número de cédula del anexo.')
         return
       }
-      if (cedulaAnexoEstado && !cedulaAnexoEstado.ok) {
-        toast.error('El número de cédula del anexo no coincide con el del ciudadano. Corrígelo antes de radicar.')
+      if (!cedulaAnexoEstado?.ok) {
+        toast.error(
+          cedulaAnexoEstado
+            ? 'El número de cédula del anexo no coincide con el del ciudadano. Corrígelo antes de radicar.'
+            : 'Aún no se ha validado el número de cédula del anexo contra el ciudadano. Vuelve a seleccionar el archivo para validarlo antes de radicar.',
+        )
         return
       }
     }
