@@ -29,6 +29,8 @@ class ClienteCdr
         string $nombreArchivo,
         ?string $rutaSoporteAbsoluta = null,
         ?string $nombreSoporte = null,
+        ?string $rutaDocumentoIdentidadAbsoluta = null,
+        ?string $nombreDocumentoIdentidad = null,
     ): array {
         $request = Http::withToken($this->token)
             ->acceptJson()
@@ -42,6 +44,13 @@ class ClienteCdr
         // RecibidoVurService::procesarAutomaticamente en el repo CDR).
         if ($rutaSoporteAbsoluta && $nombreSoporte) {
             $request = $request->attach('soporte', file_get_contents($rutaSoporteAbsoluta), $nombreSoporte);
+        }
+
+        // Cédula de ciudadanía (anexo obligatorio de Carta de Residencia en
+        // VUR) — se reenvía como "documento_identidad" para que quede en el
+        // expediente de CDR igual que cuando llega por el formulario público.
+        if ($rutaDocumentoIdentidadAbsoluta && $nombreDocumentoIdentidad) {
+            $request = $request->attach('documento_identidad', file_get_contents($rutaDocumentoIdentidadAbsoluta), $nombreDocumentoIdentidad);
         }
 
         $response = $request->post("{$this->baseUrl}/v1/recibidos-vur", $datos);

@@ -45,27 +45,41 @@ class EnviarSolicitudResidenciaACdr implements ShouldQueue
 
         $remitente = $service->terceroInfo($radicado->tercero);
 
+        // Busca, entre los anexos del radicado, el documento de un tipo_id
+        // puntual (cédula, certificado electoral) y devuelve su ruta
+        // absoluta + nombre original, o [null, null] si no está.
+        $buscarAnexo = function (int $tipoAnexoId) use ($radicado, $pdfStorage): array {
+            $anexo = collect($radicado->anexos ?? [])
+                ->first(fn (array $a) => (int) ($a['tipo_id'] ?? 0) === $tipoAnexoId && $a['documento_id']);
+
+            if (!$anexo) {
+                return [null, null];
+            }
+
+            $documento = $radicado->documentos->firstWhere('id', $anexo['documento_id']);
+            if (!$documento) {
+                return [null, null];
+            }
+
+            return [$pdfStorage->rutaAbsoluta($documento->ruta_almacenamiento), $documento->nombre_original];
+        };
+
+        // Cédula de ciudadanía: anexo obligatorio de Carta de Residencia en
+        // VUR — se reenvía siempre que exista, para que quede en el
+        // expediente de CDR como "documento_identidad".
+        [$rutaDocumentoIdentidadAbsoluta, $nombreDocumentoIdentidad] = $buscarAnexo(
+            (int) config('services.cdr.tipo_anexo_cedula_id'),
+        );
+
         // Certificado Electoral es el único medio con soporte opcional en
         // VUR (SISBEN/JAC no se adjuntan aquí, igual que en el formulario
         // público de CDR) — si el operador lo agregó como anexo, se busca su
         // documento para enviarlo junto con el recibido. Si no está, se
         // manda sin soporte: CDR se encarga de pedir la subsanación (ver
         // RecibidoVurService::procesarAutomaticamente en el repo CDR).
-        $rutaSoporteAbsoluta = null;
-        $nombreSoporte = null;
-        if ($radicado->medio_acreditacion === 'electoral') {
-            $tipoAnexoElectoralId = (int) config('services.cdr.tipo_anexo_certificado_electoral_id');
-            $anexoElectoral = collect($radicado->anexos ?? [])
-                ->first(fn (array $a) => (int) ($a['tipo_id'] ?? 0) === $tipoAnexoElectoralId && $a['documento_id']);
-
-            if ($anexoElectoral) {
-                $documentoElectoral = $radicado->documentos->firstWhere('id', $anexoElectoral['documento_id']);
-                if ($documentoElectoral) {
-                    $rutaSoporteAbsoluta = $pdfStorage->rutaAbsoluta($documentoElectoral->ruta_almacenamiento);
-                    $nombreSoporte = $documentoElectoral->nombre_original;
-                }
-            }
-        }
+        [$rutaSoporteAbsoluta, $nombreSoporte] = $radicado->medio_acreditacion === 'electoral'
+            ? $buscarAnexo((int) config('services.cdr.tipo_anexo_certificado_electoral_id'))
+            : [null, null];
 
         try {
             $resultado = $cdr->enviarRecibido(
@@ -85,6 +99,8 @@ class EnviarSolicitudResidenciaACdr implements ShouldQueue
                 nombreArchivo: $documentoEntrada->nombre_original,
                 rutaSoporteAbsoluta: $rutaSoporteAbsoluta,
                 nombreSoporte: $nombreSoporte,
+                rutaDocumentoIdentidadAbsoluta: $rutaDocumentoIdentidadAbsoluta,
+                nombreDocumentoIdentidad: $nombreDocumentoIdentidad,
             );
 
             // 409: CDR ya tenía este radicado_vur registrado — casi siempre
