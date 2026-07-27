@@ -145,6 +145,12 @@ export default function RadicadoNuevo() {
   // operador dice que sí, se habilita el anexo de Certificado Electoral
   // igual que el de cédula; si dice que no, se deja el aviso de subsanación.
   const [tieneAnexoElectoral, setTieneAnexoElectoral] = useState<boolean | null>(null)
+  // Catálogo de Presidentes JAC (id/sector/nombre) traído de CDR — solo se
+  // consulta la primera vez que el operador elige "JAC" como medio de
+  // acreditación (ver validarCedulaAnexo/fetch de anexos para el mismo
+  // patrón de llamada directa con fetch()).
+  const [presidentesJac, setPresidentesJac] = useState<{ sector_id: number; sector_nombre: string; presidente_nombre: string }[] | null>(null)
+  const [cargandoPresidentesJac, setCargandoPresidentesJac] = useState(false)
 
   // Modal crear tercero — solo aplica al remitente (el destino siempre es una dependencia)
   const [creandoTerceroCtx, setCreandoTerceroCtx] = useState<'remitente' | null>(null)
@@ -781,6 +787,25 @@ export default function RadicadoNuevo() {
       await new Promise(r => setTimeout(r, 350))
       setValidandoCedulaAnexo(false)
       setProgresoCedulaAnexo(0)
+    }
+  }
+
+  // Trae el catálogo de Presidentes JAC de CDR la primera vez que se
+  // necesita (medio_acreditacion='jac') — se cachea en estado, no se vuelve
+  // a pedir si el operador cambia de medio y regresa a JAC.
+  const cargarPresidentesJac = async () => {
+    if (presidentesJac !== null || cargandoPresidentesJac) return
+    setCargandoPresidentesJac(true)
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL ?? '/api/v1'}/catalogos/presidentes-jac`, {
+        headers: { Authorization: `Bearer ${useAuthStore.getState().token ?? ''}` },
+      })
+      const data = res.ok ? await res.json() : { data: [] }
+      setPresidentesJac(data.data ?? [])
+    } catch {
+      setPresidentesJac([])
+    } finally {
+      setCargandoPresidentesJac(false)
     }
   }
 
@@ -1640,7 +1665,11 @@ export default function RadicadoNuevo() {
                         </span>
                         <select
                           {...register('medio_acreditacion', {
-                            onChange: () => setTieneAnexoElectoral(null),
+                            onChange: e => {
+                              setTieneAnexoElectoral(null)
+                              setValue('sector_id', null)
+                              if (e.target.value === 'jac') cargarPresidentesJac()
+                            },
                           })}
                           className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800] text-slate-600"
                         >
@@ -1691,6 +1720,34 @@ export default function RadicadoNuevo() {
                               Puede radicar igual sin el certificado electoral. Secretaría en CDR le pedirá la
                               subsanación al ciudadano más adelante.
                             </p>
+                          )}
+                        </div>
+                      )}
+
+                      {watch('medio_acreditacion') === 'jac' && (
+                        <div className="flex flex-col gap-0.5 max-w-sm">
+                          <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wide">
+                            Presidente / Sector de Acción Comunal
+                          </span>
+                          <select
+                            {...register('sector_id', { valueAsNumber: true })}
+                            disabled={cargandoPresidentesJac}
+                            className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800] text-slate-600"
+                          >
+                            <option value="">{cargandoPresidentesJac ? 'Cargando...' : 'Seleccione...'}</option>
+                            {presidentesJac?.map(p => (
+                              <option key={p.sector_id} value={p.sector_id}>
+                                {p.sector_nombre} — {p.presidente_nombre}
+                              </option>
+                            ))}
+                          </select>
+                          {errors.sector_id?.message && (
+                            <span className="text-[11px] text-red-600">{errors.sector_id.message}</span>
+                          )}
+                          {presidentesJac !== null && presidentesJac.length === 0 && !cargandoPresidentesJac && (
+                            <span className="text-[11px] text-red-600">
+                              No se pudo cargar el catálogo de presidentes JAC de CDR. Intente de nuevo más tarde.
+                            </span>
                           )}
                         </div>
                       )}

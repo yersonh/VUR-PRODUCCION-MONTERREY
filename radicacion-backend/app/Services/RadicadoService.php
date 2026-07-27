@@ -180,6 +180,7 @@ class RadicadoService
                         'motivo' => $radicado->observaciones,
                         'barrio_vereda_sector' => $radicado->barrio_vereda_sector,
                         'medio_acreditacion' => $radicado->medio_acreditacion,
+                        'sector_id' => $radicado->sector_id,
                         'radicado_vur' => $radicado->numeroRadicado,
                     ]);
 

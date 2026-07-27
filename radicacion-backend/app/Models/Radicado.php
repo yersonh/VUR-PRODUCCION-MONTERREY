@@ -22,7 +22,7 @@ class Radicado extends Model
         'folios', 'folios_de', 'cantidad_anexos', 'tipo_anexo_id', 'otro_anexo', 'anexos',
         'fecha_documento', 'fecha_entrega',
         'medio_ingreso_id', 'observaciones', 'referencia_cdr', 'codigo_seguimiento_cdr', 'barrio_vereda_sector',
-        'medio_acreditacion',
+        'medio_acreditacion', 'sector_id',
         'ia_procesado', 'ia_campos_sugeridos',
         'estado_id', 'operador_id',
     ];

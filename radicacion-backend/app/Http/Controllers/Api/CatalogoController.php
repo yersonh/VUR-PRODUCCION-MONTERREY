@@ -9,6 +9,7 @@ use App\Models\EstadoCorrespondencia;
 use App\Models\MedioIngreso;
 use App\Models\TipoAnexo;
 use App\Models\TipoCorrespondencia;
+use App\Services\ClienteCdr;
 use App\Services\ClienteCore;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,7 +18,7 @@ class CatalogoController extends Controller
 {
     protected ClienteCore $core;
 
-    public function __construct(ClienteCore $core)
+    public function __construct(ClienteCore $core, protected ClienteCdr $cdr)
     {
         $this->core = $core;
     }
@@ -88,5 +89,12 @@ class CatalogoController extends Controller
     public function estados(): JsonResponse
     {
         return response()->json(['data' => EstadoCorrespondencia::orderBy('orden')->get()]);
+    }
+
+    // Solo se consulta cuando el operador elige "JAC" como medio de
+    // acreditación en Solicitud Carta de Residencia — ver ClienteCdr::presidentesJac.
+    public function presidentesJac(): JsonResponse
+    {
+        return response()->json(['data' => $this->cdr->presidentesJac()]);
     }
 }

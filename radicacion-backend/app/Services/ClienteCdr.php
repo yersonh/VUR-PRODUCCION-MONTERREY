@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Exception;
@@ -124,5 +125,46 @@ class ClienteCdr
         }
 
         return $response->json('data');
+    }
+
+    /**
+     * Presidentes JAC activos (con su sector), para que el operador de VUR
+     * elija el mismo dato que un ciudadano elegiría en el formulario público
+     * de CDR al marcar "JAC" como medio de acreditación — sin esto, CDR no
+     * puede notificar al presidente puntual del sector (ver
+     * SolicitudService::notificarNuevaSolicitud en el repo CDR) y cae al
+     * aviso genérico a Secretaría.
+     *
+     * Usa GET /v1/public/catalogos — el mismo endpoint sin autenticación que
+     * ya consume el formulario público, no hace falta el token de servicio
+     * para esto. Best-effort: si CDR no responde, se devuelve una lista
+     * vacía (el operador simplemente no puede elegir JAC en ese momento) en
+     * vez de tumbar el formulario de radicación.
+     *
+     * @return array<int, array{sector_id: int, sector_nombre: string, presidente_nombre: string}>
+     */
+    public function presidentesJac(): array
+    {
+        return Cache::remember('cdr:presidentes-jac', 300, function () {
+            try {
+                $response = Http::acceptJson()->timeout(5)->get("{$this->baseUrl}/v1/public/catalogos");
+            } catch (\Throwable $e) {
+                Log::warning('No se pudo obtener el catálogo de presidentes JAC de CDR (conexión)', [
+                    'exception' => $e->getMessage(),
+                ]);
+
+                return [];
+            }
+
+            if ($response->failed()) {
+                Log::warning('No se pudo obtener el catálogo de presidentes JAC de CDR (HTTP)', [
+                    'status' => $response->status(),
+                ]);
+
+                return [];
+            }
+
+            return $response->json('presidentes_jac') ?? [];
+        });
     }
 }

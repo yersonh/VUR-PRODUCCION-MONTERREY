@@ -92,6 +92,7 @@ Route::prefix('v1')->group(function () {
             Route::get('catalogos/medios-ingreso',[CatalogoController::class, 'mediosIngreso']);
             Route::get('catalogos/tipos-identificacion', [CatalogoController::class, 'tiposIdentificacion']);
             Route::get('catalogos/estados',       [CatalogoController::class, 'estados']);
+            Route::get('catalogos/presidentes-jac', [CatalogoController::class, 'presidentesJac']);
 
             // Búsqueda de entidades (para modales SearchModal)
             Route::get('terceros',  [TerceroController::class,  'index']);

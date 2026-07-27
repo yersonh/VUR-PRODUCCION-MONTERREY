@@ -444,6 +444,7 @@ class RadicadoController extends Controller
             // automáticamente y para imprimirlo en el certificado.
             'barrio_vereda_sector'    => ['nullable', 'string', 'max:255'],
             'medio_acreditacion'      => ['nullable', 'string', 'in:electoral,sisben,jac'],
+            'sector_id'               => ['nullable', 'integer'],
             'pdf_entrada'             => ['nullable', 'file', 'mimes:pdf', 'max:20480'],
             'pdf_salida'              => ['nullable', 'file', 'mimes:pdf', 'max:20480'],
         ];

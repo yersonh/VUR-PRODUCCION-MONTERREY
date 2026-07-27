@@ -40,6 +40,11 @@ const radicadoSchemaBase = z.object({
   // (IA electoral / Funcionario SISBEN / Presidente JAC) sin importar si se
   // radicó ahí o directo en VUR.
   medio_acreditacion:      z.enum(['electoral', 'sisben', 'jac']).nullable(),
+  // Solo aplica cuando medio_acreditacion='jac' — identifica al Presidente
+  // JAC exacto que debe certificar (mismo dato que el ciudadano elige en el
+  // formulario público de CDR). Sin esto, CDR no puede notificarle al
+  // presidente puntual y cae al aviso genérico a Secretaría.
+  sector_id:               z.number().nullable(),
 })
 
 // id=90: Solicitud Carta De Residencia (mismo id fijo que
@@ -56,6 +61,9 @@ export const radicadoSchema = radicadoSchemaBase.superRefine((data, ctx) => {
   }
   if (data.tipo_correspondencia_id === TIPO_CORRESPONDENCIA_RESIDENCIA_ID && !data.medio_acreditacion) {
     ctx.addIssue({ code: 'custom', path: ['medio_acreditacion'], message: 'Seleccione el medio de acreditación' })
+  }
+  if (data.medio_acreditacion === 'jac' && !data.sector_id) {
+    ctx.addIssue({ code: 'custom', path: ['sector_id'], message: 'Seleccione el presidente/sector de Acción Comunal' })
   }
 })
 
@@ -111,6 +119,7 @@ const DEFAULT_VALUES: RadicadoFormValues = {
   observaciones:           null,
   barrio_vereda_sector:    null,
   medio_acreditacion:      null,
+  sector_id:               null,
 }
 
 export function useRadicadoForm() {
