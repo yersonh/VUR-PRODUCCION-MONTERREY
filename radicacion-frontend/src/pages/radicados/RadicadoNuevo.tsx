@@ -26,10 +26,12 @@ import { useAuthStore } from '@/store/authStore'
 import { cn } from '@/lib/utils'
 
 // ids fijos sembrados por el backend — ver
-// 2026_07_12_000001_seed_tipo_correspondencia_carta_residencia.php y
-// 2026_07_20_000001_seed_tipo_anexo_cedula.php.
+// 2026_07_12_000001_seed_tipo_correspondencia_carta_residencia.php,
+// 2026_07_20_000001_seed_tipo_anexo_cedula.php y
+// 2026_07_26_000003_seed_tipo_anexo_certificado_electoral.php.
 const TIPO_CORRESPONDENCIA_RESIDENCIA_ID = 90
 const TIPO_ANEXO_CEDULA_ID = 100
+const TIPO_ANEXO_CERTIFICADO_ELECTORAL_ID = 101
 
 // ── Modales abiertos ───────────────────────────────────────────────
 type ModalKey =
@@ -139,6 +141,10 @@ export default function RadicadoNuevo() {
   const [validandoCedulaAnexo, setValidandoCedulaAnexo] = useState(false)
   const [progresoCedulaAnexo, setProgresoCedulaAnexo] = useState(0)
   const [cedulaMismatchModal, setCedulaMismatchModal] = useState<{ detectado: string | null; esperado: string; error?: string } | null>(null)
+  // Solo se pregunta cuando medio_acreditacion === 'electoral' — si el
+  // operador dice que sí, se habilita el anexo de Certificado Electoral
+  // igual que el de cédula; si dice que no, se deja el aviso de subsanación.
+  const [tieneAnexoElectoral, setTieneAnexoElectoral] = useState<boolean | null>(null)
 
   // Modal crear tercero — solo aplica al remitente (el destino siempre es una dependencia)
   const [creandoTerceroCtx, setCreandoTerceroCtx] = useState<'remitente' | null>(null)
@@ -844,6 +850,7 @@ export default function RadicadoNuevo() {
       setIaCamposAplicados([])
       setIaRevisado(false)
       setDestinoDesbloqueadoPorIA(false)
+      setTieneAnexoElectoral(null)
       navigate('/radicados')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error al guardar el radicado')
@@ -1632,7 +1639,9 @@ export default function RadicadoNuevo() {
                           Medio de acreditación
                         </span>
                         <select
-                          {...register('medio_acreditacion')}
+                          {...register('medio_acreditacion', {
+                            onChange: () => setTieneAnexoElectoral(null),
+                          })}
                           className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#C8A800] text-slate-600"
                         >
                           <option value="">Seleccione...</option>
@@ -1646,11 +1655,44 @@ export default function RadicadoNuevo() {
                       </div>
 
                       {watch('medio_acreditacion') === 'electoral' && (
-                        <p className="text-xs text-slate-500 max-w-sm">
-                          El certificado electoral es opcional para radicar: puede adjuntarlo como anexo (tipo
-                          "Certificado Electoral") si lo tiene a mano. Si no lo adjunta, Secretaría en CDR le pedirá
-                          la subsanación al ciudadano más adelante.
-                        </p>
+                        <div className="flex flex-col gap-1.5 max-w-sm">
+                          <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wide">
+                            ¿Se envió anexo de certificado electoral?
+                          </span>
+                          <div className="flex gap-3">
+                            {[true, false].map(val => (
+                              <label key={String(val)} className="flex items-center gap-1.5 cursor-pointer text-sm">
+                                <input
+                                  type="radio"
+                                  name="tiene_anexo_electoral"
+                                  checked={tieneAnexoElectoral === val}
+                                  onChange={() => {
+                                    setTieneAnexoElectoral(val)
+                                    const yaTieneElectoral = anexosItems.some(a => a.tipo_id === TIPO_ANEXO_CERTIFICADO_ELECTORAL_ID)
+                                    if (val && !yaTieneElectoral) {
+                                      setTieneAnexos(true)
+                                      syncAnexos([
+                                        ...anexosItems,
+                                        { descripcion: 'Certificado Electoral', tipo_id: TIPO_ANEXO_CERTIFICADO_ELECTORAL_ID, archivo: null },
+                                      ])
+                                    } else if (!val && yaTieneElectoral) {
+                                      syncAnexos(anexosItems.filter(a => a.tipo_id !== TIPO_ANEXO_CERTIFICADO_ELECTORAL_ID))
+                                    }
+                                  }}
+                                  className="accent-[#C8A800]"
+                                />
+                                {val ? 'Sí' : 'No'}
+                              </label>
+                            ))}
+                          </div>
+
+                          {tieneAnexoElectoral === false && (
+                            <p className="text-xs text-slate-500">
+                              Puede radicar igual sin el certificado electoral. Secretaría en CDR le pedirá la
+                              subsanación al ciudadano más adelante.
+                            </p>
+                          )}
+                        </div>
                       )}
                     </>
                   )}
