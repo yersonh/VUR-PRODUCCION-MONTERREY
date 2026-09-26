@@ -15,9 +15,13 @@ RUN apk add --no-cache \
     icu-dev \
     autoconf \
     g++ \
-    make
+    make \
+    libpng-dev \
+    libjpeg-turbo-dev \
+    freetype-dev
 
 # ── Extensiones PHP ────────────────────────────────────────────────
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg
 RUN docker-php-ext-install \
     pdo \
     pdo_pgsql \
@@ -28,7 +32,8 @@ RUN docker-php-ext-install \
     opcache \
     pcntl \
     zip \
-    intl
+    intl \
+    gd
 
 RUN pecl install redis && docker-php-ext-enable redis
 
